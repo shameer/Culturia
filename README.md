@@ -2,7 +2,7 @@
 
 *build your own database*
 
-`version 2015-08-09)`
+`version 2015-08-11)`
 
 ## (use-modules (wiredtiger))
 
