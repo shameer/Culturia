@@ -74,36 +74,13 @@ They are three objects in guile-wiredtiger:
 - `<session>` has a `<connection>` as parent. It's not threadsafe.
 - `<cursor>` has a `<session>` as parent.
 
-`pack` and `unpack` utility procedures must be used with respectively
-`cursor-key-set`, `cursor-value-set` and `cursor-key-ret`, `cursor-value-ret`.
-This is done like so right now because I need to understand better the API.
-Maybe it won't be required in the future to use `pack` and `unpack` directly.
+The last section is about the optional but useful packing procedures. This is
+important to read this section to better understand wiredtiger and debug
+your programs.
 
-Both `pack` and `unpack` of this function do not check for the validity of
-their arguments as such it can fail in non-obvious way.
+### connection
 
-```
-(pack fmt . args)) -> bytevector
-```
-
-`fmt` is a configuration string that must match the underlying key or value
-record format. It only support integral types `bBhHiIlLqQr` and variable length
-strings `S`.See [format types for more information](http://source.wiredtiger.com/2.6.1/schema.html#schema_format_types).
-`args` must *match* `fmt`.
-
-```
-(unpack fmt bytevector)) -> list
-```
-
-`fmt` is a configuration string that must match the underlying record format. It
-only support integral types `bBhHiIlLqQr` and variable length strings `S`. See
-[format types](http://source.wiredtiger.com/2.6.1/schema.html#schema_format_types)
-for more information.
-
-
-## connection
-
-### `connection-open home config) -> connection`
+#### `connection-open home config) -> connection`
 
 Open a connection to a database. Most applications will open a single connection
 to a database. A connection can be shared among several threads. There is no
@@ -118,15 +95,15 @@ Example:
 `home` the path to the database home directory. The path must exists.
 See [Database Home Directory for more information]().
 
-### `(connection-close connection [config]) -> boolean`
+#### `(connection-close connection [config]) -> boolean`
 
 Close connection. Any open sessions will be closed. config optional argument,
 that can be `leak_memory` to not free memory during close.
 
 
-## session
+### session
 
-### `(session-open connection [config]) -> <session>`
+#### `(session-open connection [config]) -> <session>`
 
 Open a session.
 
@@ -152,7 +129,7 @@ Example:
   transaction started. Dirty reads and non-repeatable reads are not possible;
   phantoms are possible.
 
-### `(session-close session)`
+#### `(session-close session)`
 
 Close the session handle. This will release the resources associated with the
 session handle, including rolling back any active transactions and closing any
@@ -164,7 +141,7 @@ the thread and transactional context of the operation.
 Thread safety: A session is not usually shared between threads, see
 Multithreading for more information.
 
-### `(session-create session name config)`
+#### `(session-create session name config)`
 
 Create a table, column group, index or file.
 
@@ -183,25 +160,25 @@ In guile-wiredtiger, `key_format` and `key_value` only support integral types
 `bBhHiIlLqQr` and variable length strings `S`. See format types for more
 information.
 
-### `(session-transaction-begin session [config])`
+#### `(session-transaction-begin session [config])`
 
 Start a transaction.
 
-### `(session-transaction-commit session [config])`
+#### `(session-transaction-commit session [config])`
 
 Commit the current transaction. A transaction must be in progress when this
 method is called. If sesssion-commit-transaction returns #f, the transaction
 was rolled back, not committed.
 
-### `(session-transaction-rollback session [config])`
+#### `(session-transaction-rollback session [config])`
 
 Roll back the current transaction. A transaction must be in progress when this
 method is called. All cursors are reset.
 
 
-## cursor
+### cursor
 
-### `(cursor-open session uri config) -> <cursor>`
+#### `(cursor-open session uri config) -> <cursor>`
 
 Open a new cursor on a data source or duplicate an existing cursor.
 
@@ -231,51 +208,49 @@ types may have limited functionality (for example, they may be read-only
 or not support transactional updates). See **Data Sources** for more
 information.
 
-### `(cursor-key-set cursor bv)`
+#### `(cursor-key-set cursor . key)`
 
 Set the key for the next operation. If an error occurs during this operation,
 a flag will be set in the cursor, and the next operation to access the value
 will fail. This simplifies error handling in applications.
 
-`bv` is a 8bit bytevector that can be generated with pack. The bytevector must
-consistent with the format of the current object key.
+`key` must consistent with the format of the current object key.
 
-### `(cursor-value-set cursor bv)`
+#### `(cursor-value-set cursor key)`
 
 Set the key for the next operation. If an error occurs during this operation,
 a flag will be set in the cursor, and the next operation to access the key will
 fail. This simplifies error handling in applications.
 
-`bv` is a 8bit bytevector that can be generated with pack. The bytevector must
-consistent with the format of the current object value.
+`key` must consistent with the format of the current object value.
 
-### `(cursor-key-ref cursor) -> bytevector`
+#### `(cursor-key-ref cursor) -> list`
 
 
 Get the key for the current record. The returned value is a bytevector that can
 be unpacked using the correct key format string of the associated object.
 
-### `(cursor-value-ref cursor) -> bytevector`
+#### `(cursor-value-ref cursor) -> list`
 
 Get the value for the current record. The returned value is a bytevector that
 can be unpacked using the correct key format string of the associated object.
 
-### `(cursor-next cursor) -> boolean`
+#### `(cursor-next cursor) -> boolean`
 
 Move the cursor to the next record. Returns #f if there is no more records.
 
-### `(cursor-previous cursor) -> boolean`
+#### `(cursor-previous cursor) -> boolean`
 
 Move the cursor to the previous record. Returns #f if there is no more records.
 
-### `(cursor-reset cursor) -> boolean`
+#### `(cursor-reset cursor) -> boolean`
 
 Reset the position of the cursor. Any resources held by the cursor are released,
 and the cursor's key and position are no longer valid. A subsequent iteration
 with `cursor-next` will move to the first record, or with `cursor-prev` will
 move to the last record.
 
-### `(cursor-search cursor) -> boolean`
+#### `(cursor-search cursor) -> boolean`
 
 On sucess move the cursor to the record matching the key. The key must first
 be set.
@@ -283,7 +258,7 @@ be set.
 To minimize cursor resources, the `cursor-reset` method should be called as soon
 as the record has been retrieved and the cursor no longer needs that position.
 
-### `(cursor-search-near cursor) -> -1, 0, 1 or #f`
+#### `(cursor-search-near cursor) -> -1, 0, 1 or #f`
 
 Return the record matching the key if it exists, or an adjacent record.
 An adjacent record is either the smallest record larger than the key or the
@@ -294,7 +269,7 @@ On success, the cursor ends positioned at the returned record; to minimize
 cursor resources, the cursor-reset method should be called as soon as the record
 has been retrieved and the cursor no longer needs that position.
 
-### `(cursor-insert cursor) -> boolean`
+#### `(cursor-insert cursor) -> boolean`
 
 Insert a record and optionally update an existing record.
 
@@ -324,7 +299,7 @@ The maximum length of a single column stored in a table is not fixed (as it
 partially depends on the underlying file configuration), but is always a small
 number of bytes less than 4GB.
 
-### `(cursor-update cursor) -> boolean`
+#### `(cursor-update cursor) -> boolean`
 
 Update a record and optionally insert an existing record.
 
@@ -343,7 +318,7 @@ The maximum length of a single column stored in a table is not fixed (as it
 partially depends on the underlying file configuration), but is always a small
 number of bytes less than 4GB.
 
-### `(cursor-remove cursor) -> boolean`
+#### `(cursor-remove cursor) -> boolean`
 
 Remove a record. The key must be set.
 
@@ -362,8 +337,65 @@ On success, the cursor ends positioned at the removed record; to minimize cursor
 resources, the cursor-reset method should be called as soon as the cursor no
 longer needs that position.
 
-### `(cursor-close cursor) -> boolean`
+#### `(cursor-close cursor) -> boolean`
 
 Close the cursor. This releases the resources associated with the cursor handle.
 Cursors are closed implicitly by ending the enclosing connection or closing the
 session in which they were opened.
+
+## Packing
+
+You will need to use packing function directly if you build some kind of generic
+database. If you use wiredtiger like a regular RDBMS by setting the correct
+format for each column guile-wiredtiger will take care of packing and unpacking.
+
+### high level
+
+`(scm->bytevector scm)` and `(bytevector->scm bv)` are both built to work
+together on column with `u` format. It makes possible to use a column to store
+anykind of scheme value and have an order on them. Right now the order is the
+following:
+
+- exact integers which can be signed are ordered using the integer order
+- strings comes afters integers
+- anything else. Those have not particular order. And depends guile
+  serialization format.
+
+The disavantage of this column is that it consume an extra integer to store the
+type of the object.
+
+In the future more types will be supported. And this format will be integrated
+into cursor procedures so that the conversion is transparent for the user making
+it much easier to work with this format.
+
+#### `(scm->bytevector scm) -> bytevector`
+
+#### `(bytevector->scm bv) -> scm`
+
+### low level
+
+There is also `pack` and `unpack` procedures tailored to keep the
+database ordered. They are used internally in `cursor-key-set`,
+`cursor-value-set`, `cursor-key-ref`, `cursor-value-ref`.
+
+Both `pack` and `unpack` of this function do not check for the validity of
+their arguments as such it can fail in non-obvious way and can be the reason
+why you program doesn't work.
+
+```
+(pack fmt . args)) -> bytevector
+```
+
+`fmt` is a configuration string that must match the underlying key or value
+record format. It only support integral types `bBhHiIlLqQr` and variable length
+strings `S`.See [format types for more information](http://source.wiredtiger.com/2.6.1/schema.html#schema_format_types).
+`args` must *match* `fmt`.
+
+```
+(unpack fmt bytevector)) -> list
+```
+
+`fmt` is a configuration string that must match the underlying record format. It
+only support integral types `bBhHiIlLqQr` and variable length strings `S`. See
+[format types](http://source.wiredtiger.com/2.6.1/schema.html#schema_format_types)
+for more information.
