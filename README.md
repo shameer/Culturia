@@ -4,6 +4,12 @@
 
 `version 2015-08-11)`
 
+- ACID
+- networkless
+- automatic index
+- multithread support
+- ordered key/value store
+
 ## (use-modules (wiredtiger))
 
 ```scheme
