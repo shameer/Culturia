@@ -12,7 +12,15 @@
 - multithread support
 - ordered key/value store
 
+Author: [amirouche](mailto:amirouche@hypermove.net)
+
+License: GPL2+ (same as wiredtiger)
+
+Join us at **irc.freenode.net#guile** for support.
+
 ## (use-modules (wiredtiger))
+
+Create the `/tmp/wt` directory before running the following example:
 
 ```scheme
 (define connection (pk (connection-open "/tmp/wt" "create")))
@@ -58,7 +66,8 @@ with SQLite.
 
 ## Installation
 
-wiredtiger does **not** work on 32 bits architectures.
+wiredtiger does **not** work on 32 bits architectures. It was tested with
+wiredtiger `2.6.1` but might work with future versions.
 
 You need to install wiredtiger (tested with 2.6.1) with the usual
 `./configure && make && make install` cli dance. If you prefer to
@@ -86,7 +95,7 @@ They are three objects in guile-wiredtiger:
 - `<session>` has a `<connection>` as parent. It's not threadsafe.
 - `<cursor>` has a `<session>` as parent.
 
-The last section is about the optional but useful packing procedures. This is
+The last section is about the optional but useful *packing procedures*. This is
 important to read this section to better understand wiredtiger and debug
 your programs.
 
@@ -140,6 +149,8 @@ Example:
 - `snapshot` transactions read the versions of records committed before the
   transaction started. Dirty reads and non-repeatable reads are not possible;
   phantoms are possible.
+
+If you don't know what you are doing, use `snapshot`.
 
 #### `(session-close session)`
 
@@ -411,3 +422,8 @@ strings `S`.See [format types for more information](http://source.wiredtiger.com
 only support integral types `bBhHiIlLqQr` and variable length strings `S`. See
 [format types](http://source.wiredtiger.com/2.6.1/schema.html#schema_format_types)
 for more information.
+
+# Support
+
+For any question reach us via IRC at **irc.freenode.net#guile** for support. Or
+via the [users mailling list](https://www.gnu.org/software/guile/community.html).
