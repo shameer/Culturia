@@ -2,9 +2,6 @@
 
 *build your own database*
 
-`version 2015-08-11`
-
-`wiredtiger 2.6.1`
 
 - ACID
 - networkless
@@ -12,11 +9,15 @@
 - multithread support
 - ordered key/value store
 
-Author: [amirouche](mailto:amirouche@hypermove.net)
 
-License: GPL2+ (same as wiredtiger)
+## Informations
 
-Join us at **irc.freenode.net#guile** for support.
+- Langue: Scheme GNU Guile
+- Tested with *wiredtiger 2.6.1*
+- License: GPL2+ (same as wiredtiger)
+- Join us at **irc.freenode.net#guile** for support.
+- Author: [amirouche](mailto:amirouche@hypermove.net)
+
 
 ## (use-modules (wiredtiger))
 
