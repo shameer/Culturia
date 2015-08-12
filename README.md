@@ -4,6 +4,7 @@
 ## Build your own database
 
 - ACID
+- NoSQL
 - networkless
 - automatic index
 - multithread support
