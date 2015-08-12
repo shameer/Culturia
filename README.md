@@ -1,8 +1,10 @@
-# guile-wiredtiger
+# guile-wiredtiger 0.2
 
 *build your own database*
 
 `version 2015-08-11`
+
+`wiredtiger 2.6.1`
 
 - ACID
 - networkless
@@ -49,6 +51,10 @@ to be the best of its kind taking advantage of new hardwares.
 
 It's not only a database. With wiredtiger you can build fine tuned
 databases and competitive generic databases like mysql or mongodb.
+
+It can provide a performance boost for your application but also simplify
+its design by using a schema that is simpler than the one you would use
+with SQLite.
 
 ## Installation
 
