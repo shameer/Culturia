@@ -1,3 +1,5 @@
+(use-modules (wiredtiger))
+
 (define connection (pk (connection-open "/tmp/wt" "create")))
 (define session (pk (session-open connection)))
 
