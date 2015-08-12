@@ -1,7 +1,6 @@
 # guile-wiredtiger 0.2
 
-*build your own database*
-
+## Build your own database
 
 - ACID
 - networkless
