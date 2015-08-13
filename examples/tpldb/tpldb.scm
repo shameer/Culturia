@@ -174,7 +174,7 @@
   (tpldb-cursor-map (tpldb-avi tpldb)
                     (lambda (key)
                       (match-let ((a v i) key)
-                        (proc (list a (bytevector->scm v)))))
+                        (apply proc (list a (car (bytevector->scm v)) i))))
                     attribute
                     value
                     ""))
