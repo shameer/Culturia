@@ -123,6 +123,14 @@
 (define-public (tpldb-rollback tpldb)
   (session-transaction-rollback (tpldb-session tpldb)))
 
+(define-syntax-rule (with-transaction tpldb e ...)
+  (begin
+    (tpldb-begin tpldb)
+    e ...
+    (tpldb-commit tpldb)))
+
+(export with-transaction)
+
 (define-public (tpldb-close tpldb)
   (connection-close (tpldb-connection tpldb)))
 
@@ -148,27 +156,29 @@
   (apply cursor-key-set (append (list cursor) key))
   (with-cursor cursor
     (let ((code (cursor-search-near cursor)))
-      (if code
-          (if (cursor-next cursor)
-              (let loop ((out '()))  ;; retrieve all results
-                (let ((record-key (cursor-key-ref cursor)))
-                  (if (prefix? key record-key)
-                      (let ((out (cons (proc record-key) out)))
-                        (if (cursor-next cursor)
-                            (loop out)
-                            out))
-                       out)))
-              '())
-          '()))))
+      (if (not code)
+          '()
+          (begin (if (equal? code -1)
+                     (cursor-next cursor))
+                 (let loop ((out '()))  ;; retrieve all results
+                   (let ((record-key (cursor-key-ref cursor)))
+                     (if (prefix? key record-key)
+                         (let ((out (cons (proc record-key) out)))
+                           (if (cursor-next cursor)
+                               (loop out)
+                               out))
+                         out))))))))
+
 
 (define*-public (tpldb-iav-map tpldb proc uid #:optional (attribute ""))
   (tpldb-cursor-map (tpldb-iav tpldb)
-                      (lambda (key)
-                        (let* ((value (cursor-value-ref (tpldb-iav tpldb)))
-                               (value (bytevector->scm (car value))))
-                          (apply proc (append key (list value)))))
+                    (lambda (key)
+                      (let* ((value (cursor-value-ref (tpldb-iav tpldb)))
+                             (value (bytevector->scm (car value))))
+                          (apply proc (append key value))))
                       uid
-                      attribute))
+                      attribute
+                      #vu8()))
 
 (define*-public (tpldb-avi-map tpldb proc attribute #:optional (value #vu8()))
   (tpldb-cursor-map (tpldb-avi tpldb)
@@ -182,12 +192,10 @@
 ;;
 
 (define-public (tpldb-ref tpldb uid)
-  (tpldb-cursor-map (tpldb-iav tpldb)
-                    (lambda (key)
-                      (cons (cadr key)  ;; attribute
-                            (car (cursor-value-ref (tpldb-iav tpldb)))))
-                    uid
-                    ""))
+  (tpldb-iav-map tpldb
+                 (lambda (uid key value)
+                   (cons key value))
+                    uid))
 
 ;;
 
