@@ -180,13 +180,13 @@
                       attribute
                       #vu8()))
 
-(define*-public (tpldb-avi-map tpldb proc attribute #:optional (value #vu8()))
+(define*-public (tpldb-avi-map tpldb proc attribute #:optional value)
   (tpldb-cursor-map (tpldb-avi tpldb)
                     (lambda (key)
                       (match-let ((a v i) key)
                         (apply proc (list a (car (bytevector->scm v)) i))))
                     attribute
-                    value
+                    (if value (scm->bytevector value) #vu8())
                     ""))
 
 ;;
