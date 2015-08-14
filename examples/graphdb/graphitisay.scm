@@ -30,8 +30,6 @@
 ;;; Guile path helpers
 ;;;
 
-;; XXX: maybe not be much useful in fact
-
 (define-public (path-exists? path)
   "Return #true if path is a file or directory.
    #false if it doesn't exists"
