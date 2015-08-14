@@ -18,7 +18,9 @@
 
 (use-modules (srfi srfi-9))  ;; records
 (use-modules (srfi srfi-9 gnu))  ;; set-field & set-fields
+
 (use-modules (rnrs bytevectors))
+(use-modules (rnrs arithmetic bitwise))
 
 (use-modules (ice-9 iconv))  ;; string->bytevector
 (use-modules (ice-9 format))
@@ -31,241 +33,113 @@
 ;;; Packing
 ;;;
 ;;
-;; Adapted from wiredtiger Python bindings
-;;
+;; FIXME: support all numbers
+;; FIXME: maybe use compression format to have small representation for small
+;;        numbers
 
-;; packing helpers
+(define-public (pack-exact-positive-integer number)
+  (define (pad bytes)
+    (if (eq? (length bytes) 8)
+        bytes
+        (pad (cons 0 bytes))))
 
-(define (number->byte-list value)
-  ;; this is the *inversed* 64 bit representation of value
-  (list
-   (logand 255 9000)
-   (logand 255 (ash 9000 -8))
-   (logand 255 (ash 9000 -16))
-   (logand 255 (ash 9000 -24))
-   (logand 255 (ash 9000 -32))
-   (logand 255 (ash 9000 -40))
-   (logand 255 (ash 9000 -48))
-   (logand 255 (ash 9000 -56))))
+  (if (> number (- (integer-expt 2 64) 1))
+      (throw 'wiredtiger "number is bigger than 2**64-1"))
 
-(define (string->byte-list string)
-  (bytevector->u8-list (string->bytevector string "utf-8")))
+  (if (< number 0)
+      (throw 'wiredtiger "number must be positive"))
 
-(define (find-end-of-mark bv mark i)
-  (if (= (bytevector-u8-ref bv i) mark)
-      (find-end-of-mark bv mark (+ i 1))
-      i))
+  (if (not (exact-integer? number))
+      (throw 'wiredtiger "number must be exact"))
 
-(define (bytevector-copy source dest from-index at-index)
-  (if (= from-index (bytevector-length source))
-      dest
-      (begin
-        (bytevector-u8-set! dest at-index (bytevector-u8-ref source from-index))
-        (bytevector-copy source dest (+ from-index 1) (+ at-index 1)))))
+  (pad (let loop ((number number)
+                  (out '()))
+         (if (eq? number 0)
+             out
+             (loop (bitwise-arithmetic-shift-right number 8)
+                   (cons (bitwise-and number #xFF) out))))))
 
-(define (bytevector-take bv index)
-  (letrec ((%take% (lambda (current out)
-                     (if (= current index)
-                         out
-                         (begin
-                           (bytevector-u8-set! out current (bytevector-u8-ref bv current))
-                           (%take% (+ current 1) out))))))
-    (%take% 0 (make-bytevector index))))
+(define pack-integer pack-exact-positive-integer)
 
-(define-public (bytevector-drop bv index)
-  (bytevector-copy bv (make-bytevector (- (bytevector-length bv) index)) index 0))
+(define-public (unpack-exact-positive-integer bytes)
+  (define (unpad bytes)
+    (if (eq? (car bytes) 0)
+        (unpad (cdr bytes))
+        bytes))
 
-(define (long-long-bytevector x)
-  (let ((out (make-bytevector 8)))
-    (bytevector-u64-set! out 0 x (endianness big))
-    out))
+  (let loop ((bytes (unpad bytes))
+             (number 0))
+    (if (null? bytes)
+        number
+        (loop (cdr bytes)
+              (let ((inter (bitwise-arithmetic-shift number 8)))
+                (+ inter (car bytes)))))))
 
-(define* (bytevector-find bv v #:optional (offset 0))
-  (if (equal? (bytevector-u8-ref bv 0) v)
-      offset
-      (bytevector-find (bytevector-drop bv 1) v (+ offset 1))))
 
-(define (bytevector-append bv others)
-  (if (null? others)
-      bv
-      (letrec* ((other (car others))
-                (out (make-bytevector (+ (bytevector-length bv) (bytevector-length other)))))
-        (bytevector-copy! bv 0 out 0 (bytevector-length bv))
-        (bytevector-copy! other 0 out (bytevector-length bv) (bytevector-length other))
-        (bytevector-append out (cdr others)))))
+(define (unpack-integer bytes)
+  (values (unpack-exact-positive-integer (pk (list-head bytes 8)))
+          (list-tail bytes 8)))
 
-(define (char-in c seq)
-  (if (= (string-length seq) 0)
-      #f
-      (if (equal? c (string-ref seq 0))
-          #t
-          (char-in c (string-drop seq 1)))))
 
-(define (one-if-zero x)
-  (if (eq? x 0) 1 x))
+;;;
+;;; unpack and pack
+;;;
 
-;;; integer packing & unpacking
+(define (pack spec . values)
+  (u8-list->bytevector
+   (let next ((spec (zip (string->list spec) values))
+              (bytes '()))
+     (if (null? spec)
+         bytes
+         (cond
+          ;; variable length string
+          ((equal? (car spec) #\S)
+           (loop (cdr spec) (append out (string->u8list value) '(0))))
+          ;; variable length bytevector
+          ;;
+          ;; XXX: because wiredtiger use U internally we have to declare it
+          ;;      here because of how value are parsed in cursor procedures
+          ;;      that said U should not be used in user code as it is not
+          ;;      part of the public API and things can change
+          ((or (equal? (car spec) #\u) (equal? (car spec) #\U))
+           (loop (cdr spec) (append out
+                                    (pack-integer (bytevector-length value))
+                                    (bytevector->u8-list value))))
 
-;; Variable-length integer packing
-;; need: up to 64 bits, both signed and unsigned
+         ;; integral type
+         (else (loop (cdr spec) (append out (pack-integer value)))))))))
 
-;; Try hard for small values (up to ~2 bytes), after that, just encode the
-;; length in the first byte.
-
-;;  First byte | Next |                        |
-;;  byte       | bytes| Min Value              | Max Value
-;; ------------+------+------------------------+--------------------------------
-;; [00 00xxxx] | free | N/A                    | N/A
-;; [00 01llll] | 8-l  | -2^64                  | -2^13 - 2^6
-;; [00 1xxxxx] | 1    | -2^13 - 2^6            | -2^6 - 1
-;; [01 xxxxxx] | 0    | -2^6                   | -1
-;; [10 xxxxxx] | 0    | 0                      | 2^6 - 1
-;; [11 0xxxxx] | 1    | 2^6                    | 2^13 + 2^6 - 1
-;; [11 10llll] | l    | 2^14 + 2^7             | 2^64 - 1
-;; [11 11xxxx] | free | N/A                    | N/A
-
-(define neg-multi-marker #x10)
-(define neg-2byte-marker #x20)
-(define neg-1byte-marker #x40)
-(define pos-1byte-marker #x80)
-(define pos-2byte-marker #xc0)
-(define pos-multi-marker #xe0)
-
-(define neg-1byte-min (* -1 (integer-expt -2 6)))
-(define neg-2byte-min (+ (integer-expt -2 13) neg-1byte-min))
-(define pos-1byte-max (- (integer-expt 2 6) 1))
-(define pos-2byte-max (+ (integer-expt 2 13) pos-1byte-max))
-
-(define minus-bit (ash -1 64))
-(define uint64-mask #xffffffffffffffff)
-
-(define* (get-bits x start #:optional (end 0))
-  (ash (logand x (- (ash 1 start) 1)) (* -1 end)))
-
-(define* (get-int bytes #:optional (value 0))
-  (if (null? bytes) value
-      (get-int (cdr bytes) (logior (ash value 8) (car bytes)))))
-
-(define-public (pack-integer x)
-  (cond ((< x neg-2byte-min)
-         (letrec* ((bytes (number->byte-list (logand x uint64-mask)))
-                   (length (list-index bytes 255))
-                   (tail (reverse (list-head bytes length)))
-                   (head (logior neg-multi-marker (get-bits (- 8 length) 4))))
-           (cons head tail)))
-        ((< x neg-1byte-min)
-         (let ((x2 (- x neg-2byte-min)))
-           (list (logior neg-2byte-marker (get-bits x2 13 8)) (get-bits x2  8))))
-        ((< x 0) (let ((x2 (- x neg-1byte-min)))
-                   (list (logior neg-1byte-marker (get-bits x 6)))))
-        ((<= x pos-1byte-max) (list (logior pos-1byte-marker (get-bits x 6))))
-        ((<= x pos-2byte-max) (let ((x2 (- x (+ pos-2byte-max 1))))
-                              (list (logior pos-2byte-marker (get-bits x2 13 8)) (get-bits x2 8))))
-        (else  (letrec* ((bytes (number->byte-list (- x (+ 1 pos-2byte-max))))
-                         (length (list-index bytes 0))
-                         (tail (reverse (list-head bytes length)))
-                         (head (logior pos-multi-marker (get-bits length 4))))
-                 (cons head tail)))))
-
-(define-public (unpack-integer bytes)
-  (let ((marker (car bytes)))
-    (cond ((< marker neg-2byte-marker)
-           (let ((sz (- 8 (get-bits marker 4))))
-             (values (logior (ash -1 (ash sz 3)) (get-int (list-head (list-tail bytes 1) sz))
-                      (list-tail bytes (+ sz 1))))))
-          ((< marker neg-1byte-marker)
-           (values (+ neg-2byte-min (logior (ash (get-bits marker 5) 8) (cadr bytes)))
-                   (list-tail bytes 2)))
-          ((< marker pos-1byte-marker)
-           (values (+ neg-1byte-min (get-bits marker 6)) (list-tail bytes 1)))
-          ((< marker pos-2byte-marker)  (values (get-bits marker 6) (list-tail bytes 1)))
-          ((< marker pos-multi-marker)
-           (values (+ pos-1byte-max 1 (logior (ash (get-bits marker 5) 8)) (cadr bytes))
-                   (list-tail bytes 2)))
-          (else (let ((sz (get-bits marker 4)))
-                  (values (+ pos-2byte-max 1 (get-int (list-head (list-tail bytes 1) sz)))
-                          (list-tail bytes (+ sz 1))))))))
-
-;; pack and unpack implementation
-
-(define (get-type fmt)
- (let ((tfmt (string-ref fmt 0)))
-  (if (char-in tfmt ".@<>")
-   (values tfmt (string-drop fmt 1))
-   (values "." fmt))))
-
-(define (parse-format fmt)
-  (if (string->number (string-take fmt 1))
-      (values (string-drop fmt 2) (string->number (string-take fmt 1)) (string-ref fmt 1))
-      (values (string-drop fmt 1) 0 (string-ref fmt 0))))
-
-(define (unpack-integers bytes number out)
-  (if (equal? number 0)
-      (values bytes out)
-      (receive (value bytes) (unpack-integer bytes)
-        (unpack-integers bytes (- number 1) (cons value out)))))
-
-(define (unpack-rec fmt bytes out)
-  (if (= (string-length fmt) 0)
-      out
-      (receive (fmt size char) (parse-format fmt)
-        (cond
-         ;; variable length string
-         ((equal? char #\S)
-          (letrec* ((end (list-index bytes 0))
-                    (tail (list-tail bytes (+ end 1)))
-                    (head (list-head bytes end))
-                    (string (bytevector->string (list->u8vector head) "utf8")))
-            (unpack-rec fmt tail (cons string out))))
-         ;; variable length bytevector
-         ((or (equal? char #\u) (equal? char #\U))
-          (receive (size bytes) (unpack-integer bytes)
-            (letrec* ((tail (list-tail bytes size))
-                      (head (list-head bytes size)))
-              (if (equal? char #\u)
-                  (unpack-rec fmt tail (cons (u8-list->bytevector head) out))
-                  (unpack-rec fmt tail (cons (car (unpack "u" head)) out))))))
-         (else ;; integral type
-          (receive (bytes out) (unpack-integers bytes (one-if-zero size) out)
-            (unpack-rec fmt bytes out)))))))
+(define (unpack-rec spec bv)
+  (let loop ((spec (string->list spec))
+             (bytes (bytevector->u8-list bv))
+             (values '()))
+    (cond ((and (null? spec) (null? bytes)) values)
+          ((or (null? spec) (null? bytes))
+           (throw 'wiredtiger (format #false "specification error (unpack ~a ~a)" spec bv)))
+          ((equal? (car spec) #\S)
+           (let* ((end (list-index bytes 0))
+                  (tail (list-tail bytes (+ end 1)))
+                  (head (list-head bytes end))
+                  (string (bytevector->string (list->u8vector head) "utf8")))
+             (loop (cdr spec) tail (cons values string))))
+          ;; variable length bytevector
+          ((or (equal? char #\u) (equal? char #\U))
+           (throw 'wiredtiger bytes))
+           ;; (receive (size bytes) (unpack-integer bytes)
+           ;;   (let ((tail (list-tail bytes size))
+           ;;         (head (list-head bytes size)))
+           ;;     (if (equal? char #\u)
+           ;;         (unpack-rec fmt tail (cons (u8-list->bytevector head) out))
+           ;;         ;; for some reason U has a size prefix
+           ;;         (unpack-rec fmt tail (cons (car (unpack "u" head)) out))))))
+          (else ;; integral type
+           (receive (value bytes) (unpack-integer bytes)
+             (loop (cdr spec) (cons values value)))))))
 
 (define-public (unpack fmt bytes)
   (if (bytevector? bytes)
       (reverse (unpack-rec fmt (bytevector->u8-list bytes) '()))
       (reverse (unpack-rec fmt bytes '()))))
-
-(define (make-next fmt vs)
-  (letrec* ((size (string->number (string-take fmt 1)))
-            (char (string-ref fmt (if size 1 0)))
-            (out (string-drop fmt (if size 2 1))))
-    (values out (cdr vs) char (if size size 0) (car vs))))
-
-(define (pack-integers-rec size vs out)
-  (if (= size 0)
-      (values out vs)
-      (let ((integer (pack-integer (car vs))))
-        (pack-integers-rec (- size 1) (cdr vs) (append out integer)))))
-
-(define (pack-rec fmt vs out)
-  (if (= (string-length fmt) 0)
-      out
-      (receive (fmt vs char size value) (make-next fmt vs)
-        (cond
-         ;; variable length string
-         ((equal? char #\S)
-          (pack-rec fmt vs (append out (string->byte-list value) '(0))))
-
-         ;; variable length bytevector
-         ((or (equal? char #\u) (equal? char #\U))
-          (pack-rec fmt vs (append out (pack-integer (bytevector-length value)) (bytevector->u8-list value))))
-
-         ;; integral type
-         (else
-          (receive (out vs) (pack-integers-rec (one-if-zero size) (cons value vs) out)
-            (pack-rec fmt vs out)))))))
-
-(define-public (pack fmt . vs)
-  (u8-list->bytevector (pack-rec fmt vs '())))
 
 ;; helper to store arbitrary values
 ;; in wiredtiger and take advantage
@@ -554,7 +428,7 @@
      (let* (;; call the foreign function
             (code (foreign-function (session-handle session))))
        (if (not (eq? code 0))
-           (let ((message (format #false "(session-close ~s)")))
+           (let ((message (format #false "(session-close ~s)" session)))
              (wiredtiger-string-error message code)))))))
 
 (define-public (session-close session)
@@ -590,7 +464,7 @@
 (define*-public (session-transaction-commit session #:optional (config ""))
   ((%session-transaction-commit session) config))
 
-(define (%session-transaction-rollback session config)
+(define (%session-transaction-rollback session)
   (foreign
    (int  (session-structure-transaction-rollback (session-structure session)) *pointer* *pointer*)
    (lambda (foreign-function name config)
@@ -599,7 +473,7 @@
             (code (foreign-function (session-handle session) %config)))
        (if (eq? code 0)
            #true
-           (let ((message (format #false "(session-transaction-rollback ~s)")))
+           (let ((message (format #false "(session-transaction-rollback ~s ~s)" session config)))
              (wiredtiger-string-error message code)))))))
 
 (define*-public (session-transaction-rollback session #:optional (config ""))
