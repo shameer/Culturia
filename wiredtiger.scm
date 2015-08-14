@@ -223,7 +223,7 @@
             (letrec* ((tail (list-tail bytes size))
                       (head (list-head bytes size)))
               (if (equal? char #\u)
-                  (unpack-rec fmt tail (cons (list->u8vector head) out))
+                  (unpack-rec fmt tail (cons (u8-list->bytevector head) out))
                   (unpack-rec fmt tail (cons (car (unpack "u" head)) out))))))
          (else ;; integral type
           (receive (bytes out) (unpack-integers bytes (one-if-zero size) out)
