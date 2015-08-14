@@ -13,11 +13,6 @@
 ;;; Path helpers
 ;;;
 
-(define (path-exists? path)
-  "Return #true if path is a file or directory.
-   #false if it doesn't exists"
-  (access? path F_OK))
-
 (define (path-join . rest)
   "Return the absolute path made of REST. If the first item
    of REST is not absolute the current working directory
@@ -26,24 +21,6 @@
     (if (string-prefix? "/" path)
         path
         (string-append (getcwd) "/" path))))
-
-(define (path-split path)
-  (let ((parts (string-split path #\/)))
-    (if (equal? (car parts) "")
-        (cons (string-append "/" (cadr parts)) (cddr parts))
-        parts)))
-
-(define* (path-mkdir dirpath #:optional (parents #false))
-  "Create DIRPATH directory its parents if PARENTS is true"
-  (if parents
-      (let* ((parts (path-split dirpath))
-             (paths (let loop ((dirs (cdr parts))
-                               (out (list (car parts))))
-                      (if (null? dirs)
-                          (reverse out)
-                          (loop (cdr dirs) (cons (apply path-join (list (car out) (car dirs))) out))))))
-        (and (map (lambda (p) (if (not (path-exists? p)) (mkdir p))) paths) #true))
-      (if (not (path-exists? dirpath)) (and (mkdir dirpath) #true))))
 
 (define (path-dfs-walk dirpath proc)
   (define dir (opendir dirpath))
