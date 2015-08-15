@@ -17,167 +17,24 @@
 (define-module (wiredtiger))
 
 (use-modules (srfi srfi-9))  ;; records
-(use-modules (srfi srfi-9 gnu))  ;; set-field & set-fields
+(use-modules (srfi srfi-9 gnu))  ;; set-record-type-printer!
 
 (use-modules (rnrs bytevectors))
-(use-modules (rnrs arithmetic bitwise))
 
 (use-modules (ice-9 iconv))  ;; string->bytevector
+(use-modules (ice-9 match))
 (use-modules (ice-9 format))
-(use-modules (ice-9 optargs))  ;; define*
+(use-modules (ice-9 optargs))  ;; lambda*
 (use-modules (ice-9 receive))
 
 (use-modules (system foreign))  ;; ffi
 
 ;;;
-;;; Packing
-;;;
-;;
-;; FIXME: support all numbers
-;; FIXME: maybe use compression format to have small representation for small
-;;        numbers
-
-(define-public (pack-exact-positive-integer number)
-  (define (pad bytes)
-    (if (eq? (length bytes) 8)
-        bytes
-        (pad (cons 0 bytes))))
-
-  (if (> number (- (integer-expt 2 64) 1))
-      (throw 'wiredtiger "number is bigger than 2**64-1"))
-
-  (if (< number 0)
-      (throw 'wiredtiger "number must be positive"))
-
-  (if (not (exact-integer? number))
-      (throw 'wiredtiger "number must be exact"))
-
-  (pad (let loop ((number number)
-                  (out '()))
-         (if (eq? number 0)
-             out
-             (loop (bitwise-arithmetic-shift-right number 8)
-                   (cons (bitwise-and number #xFF) out))))))
-
-(define pack-integer pack-exact-positive-integer)
-
-(define-public (unpack-exact-positive-integer bytes)
-  (define (unpad bytes)
-    (if (eq? (car bytes) 0)
-        (unpad (cdr bytes))
-        bytes))
-
-  (let loop ((bytes (unpad bytes))
-             (number 0))
-    (if (null? bytes)
-        number
-        (loop (cdr bytes)
-              (let ((inter (bitwise-arithmetic-shift number 8)))
-                (+ inter (car bytes)))))))
-
-
-(define (unpack-integer bytes)
-  (values (unpack-exact-positive-integer (pk (list-head bytes 8)))
-          (list-tail bytes 8)))
-
-
-;;;
-;;; unpack and pack
-;;;
-
-(define (pack spec . values)
-  (u8-list->bytevector
-   (let next ((spec (zip (string->list spec) values))
-              (bytes '()))
-     (if (null? spec)
-         bytes
-         (cond
-          ;; variable length string
-          ((equal? (car spec) #\S)
-           (loop (cdr spec) (append out (string->u8list value) '(0))))
-          ;; variable length bytevector
-          ;;
-          ;; XXX: because wiredtiger use U internally we have to declare it
-          ;;      here because of how value are parsed in cursor procedures
-          ;;      that said U should not be used in user code as it is not
-          ;;      part of the public API and things can change
-          ((or (equal? (car spec) #\u) (equal? (car spec) #\U))
-           (loop (cdr spec) (append out
-                                    (pack-integer (bytevector-length value))
-                                    (bytevector->u8-list value))))
-
-         ;; integral type
-         (else (loop (cdr spec) (append out (pack-integer value)))))))))
-
-(define (unpack-rec spec bv)
-  (let loop ((spec (string->list spec))
-             (bytes (bytevector->u8-list bv))
-             (values '()))
-    (cond ((and (null? spec) (null? bytes)) values)
-          ((or (null? spec) (null? bytes))
-           (throw 'wiredtiger (format #false "specification error (unpack ~a ~a)" spec bv)))
-          ((equal? (car spec) #\S)
-           (let* ((end (list-index bytes 0))
-                  (tail (list-tail bytes (+ end 1)))
-                  (head (list-head bytes end))
-                  (string (bytevector->string (list->u8vector head) "utf8")))
-             (loop (cdr spec) tail (cons values string))))
-          ;; variable length bytevector
-          ((or (equal? char #\u) (equal? char #\U))
-           (throw 'wiredtiger bytes))
-           ;; (receive (size bytes) (unpack-integer bytes)
-           ;;   (let ((tail (list-tail bytes size))
-           ;;         (head (list-head bytes size)))
-           ;;     (if (equal? char #\u)
-           ;;         (unpack-rec fmt tail (cons (u8-list->bytevector head) out))
-           ;;         ;; for some reason U has a size prefix
-           ;;         (unpack-rec fmt tail (cons (car (unpack "u" head)) out))))))
-          (else ;; integral type
-           (receive (value bytes) (unpack-integer bytes)
-             (loop (cdr spec) (cons values value)))))))
-
-(define-public (unpack fmt bytes)
-  (if (bytevector? bytes)
-      (reverse (unpack-rec fmt (bytevector->u8-list bytes) '()))
-      (reverse (unpack-rec fmt bytes '()))))
-
-;; helper to store arbitrary values
-;; in wiredtiger and take advantage
-;; of ordering for strings and integers
-
-(define-public (scm->bytevector scm)
-  (define (scm->string scm)
-    (with-output-to-string
-      (lambda ()
-        (write scm))))
-
-  (cond
-   ((exact-integer? scm) (pack "QQ" 0 scm))
-   ((string? scm) (pack "QS" 1 scm))
-   (else (pack "QS" 2 (scm->string scm)))))
-
-(define-public (bytevector->scm bv)
-  (define (string->scm value)
-    (with-input-from-string value
-      (lambda ()
-        (read))))
-
-  (receive (kind value) (unpack-integer (bytevector->u8-list bv))
-    (cond
-     ((eq? kind 0) (unpack "Q" value))
-     ((eq? kind 1) (unpack "S" value))
-     (else (string->scm (car (unpack "S" value)))))))
-
-;;;
-;;; Guile helpers
+;;; srfi-99
 ;;;
 ;;
 ;; macro to quickly define immutable records
 ;;
-;; FIXME: Taken from Guile (maybe should be in (srfi srfi-99))
-;;        adapted to make it possible to declare record type like `<abc>' and keep
-;;        field accessor bracket free. record name *must* have brackets or everything
-;;        is broken
 ;;
 ;; Usage:
 ;;
@@ -185,9 +42,7 @@
 ;;   (define zzz (make-abc 1 2))
 ;;   (abc-field-one zzz) ;; => 1
 ;;
-;; FIXME: maybe this is less useful than the immutable record of (srfi srfi-9 gnu)
-;;        I still use `set-field` and `set-fields`
-;;
+
 (define-syntax define-record-type*
   (lambda (x)
     (define (%id-name name) (string->symbol (string-drop (string-drop-right (symbol->string name) 1) 1)))
@@ -480,29 +335,6 @@
   ((%session-transaction-rollback session) config))
 
 ;;;
-;;; Item
-;;;
-
-(define-record-type* <item> handle bv)
-
-(set-record-type-printer! <item>
-                          (lambda (record port)
-                            (format port
-                                    "<item 0x~x>"
-                                    (pointer-address (item-handle record)))))
-
-
-;; record holding structure pointers
-(define-record-type* <item-structure>
-  data
-  size
-  ;; internal fields
-  flags
-  mem
-  mem-size
-)
-
-;;;
 ;;; Cursor
 ;;;
 
@@ -556,7 +388,7 @@
             (double-pointer (bytevector->pointer pointer))
             ;; convert arguments to c types
             (%uri (string->pointer uri))
-            (%config (string->pointer (string-append "raw," config)))
+            (%config (string->pointer config))
             ;; call the foreign function
             (code (foreign-function (session-handle session) %uri *NULL* %config double-pointer)))
        (if (eq? code 0)
@@ -567,81 +399,100 @@
 (define*-public (cursor-open session uri #:optional (config ""))
   ((%cursor-open session) uri config))
 
-(define (%cursor-key-ref cursor)
-  (foreign
-   (int (cursor-structure-key-ref (cursor-structure cursor)) *pointer* *pointer*)
-   (lambda (foreign-function)
-     (let* (;; init empty item structure
-            (item #u64(0 0 0 0 0))
-            (pointer (bytevector->pointer item))
-            ;; call the foreign function
-            (code (foreign-function (cursor-handle cursor) pointer)))
-       (if (eq? code 0)
-           (let ((bv (pointer->bytevector (make-pointer (array-ref item 0))
-                                          (array-ref item 1)
-                                          0
-                                          'u64)))
-             (unpack (cursor-key-format cursor) bv))
-           (let ((message (format #false "(cursor-key-ref ~a)" cursor)))
-             (wiredtiger-string-error message code)))))))
+
+;;; key/value set/ref
+
+(define (item->string bv)
+  (pointer->string (make-pointer (array-ref bv 0))))
+
+(define (item->integer bv)
+  (array-ref bv 0))
+
+
+(define *item->value* `((#\S . ,item->string)
+                        (#\Q . ,item->integer)))
+
+(define (pointers->scm formats pointers)
+  (pk formats pointers)
+  (let loop ((formats (string->list formats))
+             (pointers pointers)
+             (out '()))
+    (cond
+     ((and (null? formats) (null? pointers)) out)
+     ((or (null? formats) (null? pointers))
+      (throw 'wiredtiger "failed to ref cursor value due to format error"))
+     (else (loop (cdr formats)
+                 (cdr pointers)
+                 (append out (list ((assoc-ref *item->value* (car formats)) (car pointers)))))))))
 
 (define-public (cursor-key-ref cursor)
-  ((%cursor-key-ref cursor)))
+  (let* ((args (map (lambda (_) #u64(0 0 0 0 0)) (string->list (cursor-key-format cursor))))
+         (args* (append (list (cursor-handle cursor)) (map bytevector->pointer args)))
+         (signature (map (lambda (_) *pointer*) args*))
+         (proc (pointer->procedure int
+                                   (cursor-structure-key-ref (cursor-structure cursor))
+                                   signature)))
+    (apply proc args*)
+    (pointers->scm (cursor-key-format cursor) args)))
 
-(define (%cursor-value-ref cursor)
-  (foreign
-   (int (cursor-structure-value-ref (cursor-structure cursor)) *pointer* *pointer*)
-   (lambda (foreign-function)
-     (let* (;; init empty item structure
-            (item #u64(0 0 0 0 0))
-            (pointer (bytevector->pointer item))
-            ;; call the foreign function
-            (code (foreign-function (cursor-handle cursor) pointer)))
-       (if (eq? code 0)
-           (let ((bv (pointer->bytevector (make-pointer (array-ref item 0))
-                                          (array-ref item 1)
-                                          0
-                                          'u64)))
-             (unpack (cursor-value-format cursor) bv))
-           (let ((message (format #false "(cursor-value-ref ~a)" cursor)))
-             (wiredtiger-string-error message code)))))))
 
 (define-public (cursor-value-ref cursor)
-  ((%cursor-value-ref cursor)))
+  (let* ((args (map (lambda (_) #u64(0 0 0 0 0)) (string->list (cursor-value-format cursor))))
+         (args* (append (list (cursor-handle cursor)) (map bytevector->pointer args)))
+         (signature (map (lambda (_) *pointer*) args*))
+         (proc (pointer->procedure int
+                                   (cursor-structure-value-ref (cursor-structure cursor))
+                                   signature)))
+    (apply proc args*)
+    (pointers->scm (cursor-value-format cursor) args)))
 
-(define (%cursor-key-set cursor)
-  (foreign
-   (int (cursor-structure-key-set (cursor-structure cursor)) *pointer* *pointer*)
-   (lambda (foreign-function key)
-     (let* (;; init item structure
-            (bv (apply pack (append (list (cursor-key-format cursor)) key)))
-            (bv* (bytevector->pointer bv))
-            (address (pointer-address bv*))
-            (size (bytevector-length bv))
-            (item (list->u64vector (list address size 0 0 0)))
-            (pointer (bytevector->pointer item)))
-       ;; call the foreign function
-       (foreign-function (cursor-handle cursor) pointer)))))
+
+
+;;; set procedures
+
+;;;
+;;; Item
+;;;
+
+(define (make-item bv)
+  (bytevector->pointer (list->u64vector (list (pointer-address (bytevector->pointer bv))
+                                                       (bytevector-length bv)
+                                                       0
+                                                       0
+                                                       0))))
+
+(define *format->pointer* `((#\S . ,(lambda (value) (bytevector->pointer
+                                                     (string->bytevector (string-append value "\0")
+                                                                         "utf-8"))))
+                             (#\Q . ,(lambda (value) (make-pointer value)))))
+
+(define (formats->items formats values)
+  (let loop ((formats (string->list formats))
+             (values values)
+             (out '()))
+    (cond
+     ((and (null? formats) (null? values)) out)
+     ((or (null? formats) (null? values))
+      (throw 'wiredtiger "failed to set cursor due to format error"))
+     (else (loop (cdr formats)
+                 (cdr values)
+                 (append out (list ((assoc-ref *format->pointer* (car formats)) (car values)))))))))
 
 (define-public (cursor-key-set cursor . key)
-  ((%cursor-key-set cursor) key))
-
-(define (%cursor-value-set cursor)
-  (foreign
-   (int (cursor-structure-value-set (cursor-structure cursor)) *pointer* *pointer*)
-   (lambda (foreign-function value)
-     (let* (;; init item structure
-            (bv (apply pack (append (list (cursor-value-format cursor)) value)))
-            (bv* (bytevector->pointer bv))
-            (address (pointer-address bv*))
-            (size (bytevector-length bv))
-            (item (list->u64vector (list address size 0 0 0)))
-            (pointer (bytevector->pointer item)))
-       ;; call the foreign function
-       (foreign-function (cursor-handle cursor) pointer)))))
+  (let* ((args (append (list (cursor-handle cursor)) (formats->items (cursor-key-format cursor) key)))
+         (signature (map (lambda (_) *pointer*) args))
+         (proc (pointer->procedure int
+                                   (cursor-structure-key-set (cursor-structure cursor))
+                                   signature)))
+    (apply proc args)))
 
 (define-public (cursor-value-set cursor . value)
-  ((%cursor-value-set cursor) value))
+  (let* ((args (append (list (cursor-handle cursor)) (formats->items (cursor-value-format cursor) value)))
+         (signature (map (lambda (_) *pointer*) args))
+         (proc (pointer->procedure int
+                                   (cursor-structure-value-set (cursor-structure cursor))
+                                   signature)))
+    (apply proc args)))
 
 (define (%cursor-reset cursor)
   (foreign
@@ -774,29 +625,3 @@
 
 (define-public (cursor-close cursor)
   ((%cursor-close cursor)))
-
-;;; e.g.
-
-;; (define connection (pk (connection-open "/tmp/wt" "create")))
-;; (define session (pk (session-open connection)))
-
-;; ;; create a table
-;; (session-create session "table:nodes" "key_format=i,value_format=S")
-
-;; ;; open a cursor over that table
-;; (define cursor (pk (cursor-open session "table:nodes")))
-
-;; ;; start a transaction and add a record
-;; (session-transaction-begin session "isolation=\"snapshot\"")
-;; (cursor-key-set cursor 42)
-;; (cursor-value-set cursor "The one true number!")
-;; (cursor-insert cursor)
-;; (session-transaction-commit session)
-
-;; (cursor-reset cursor)
-;; (cursor-next cursor)
-;; (pk (cursor-key-ref cursor))
-;; (pk (cursor-value-ref cursor))
-;; (cursor-close cursor)
-;; (session-close session)
-;; (connection-close connection)
