@@ -4,7 +4,7 @@
 (define session (pk (session-open connection)))
 
 ;; create a table
-(session-create session "table:nodes" "key_format=i,value_format=S")
+(session-create session "table:nodes" "key_format=Q,value_format=S")
 
 ;; open a cursor over that table
 (define cursor (pk (cursor-open session "table:nodes")))
@@ -15,8 +15,9 @@
 (cursor-value-set cursor "The one true number!")
 (cursor-insert cursor)
 (session-transaction-commit session)
-
 (cursor-reset cursor)
+
+;; retrieve record
 (cursor-next cursor)
 (pk (cursor-key-ref cursor))
 (pk (cursor-value-ref cursor))
