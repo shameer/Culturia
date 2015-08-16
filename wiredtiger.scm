@@ -413,7 +413,6 @@
                         (#\Q . ,item->integer)))
 
 (define (pointers->scm formats pointers)
-  (pk formats pointers)
   (let loop ((formats (string->list formats))
              (pointers pointers)
              (out '()))
