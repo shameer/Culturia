@@ -15,10 +15,6 @@ They are three objects in guile-wiredtiger:
 - `<session>` has a `<connection>` as parent. It's not threadsafe.
 - `<cursor>` has a `<session>` as parent.
 
-The last section is about the optional but useful *packing procedures*. This is
-important to read this section to better understand wiredtiger and debug
-your programs.
-
 ### connection
 
 #### `connection-open home config) -> connection`
@@ -285,60 +281,3 @@ longer needs that position.
 Close the cursor. This releases the resources associated with the cursor handle.
 Cursors are closed implicitly by ending the enclosing connection or closing the
 session in which they were opened.
-
-## Packing
-
-You will need to use packing function directly if you build some kind of generic
-database. If you use wiredtiger like a regular RDBMS by setting the correct
-format for each column guile-wiredtiger will take care of packing and unpacking.
-
-### high level
-
-`(scm->bytevector scm)` and `(bytevector->scm bv)` are both built to work
-together on column with `u` format. It makes possible to use a column to store
-anykind of scheme value and have an order on them. Right now the order is the
-following:
-
-- exact integers which can be signed are ordered using the integer order
-- strings comes afters integers
-- anything else. Those have not particular order. And depends guile
-  serialization format.
-
-The disavantage of this column is that it consume an extra integer to store the
-type of the object.
-
-In the future more types will be supported. And this format will be integrated
-into cursor procedures so that the conversion is transparent for the user making
-it much easier to work with this format.
-
-#### `(scm->bytevector scm) -> bytevector`
-
-#### `(bytevector->scm bv) -> scm`
-
-### low level
-
-There is also `pack` and `unpack` procedures tailored to keep the
-database ordered. They are used internally in `cursor-key-set`,
-`cursor-value-set`, `cursor-key-ref`, `cursor-value-ref`.
-
-Both `pack` and `unpack` of this function do not check for the validity of
-their arguments as such it can fail in non-obvious way and can be the reason
-why you program doesn't work.
-
-```
-(pack fmt . args)) -> bytevector
-```
-
-`fmt` is a configuration string that must match the underlying key or value
-record format. It only support integral types `bBhHiIlLqQr` and variable length
-strings `S`.See [format types for more information](http://source.wiredtiger.com/2.6.1/schema.html#schema_format_types).
-`args` must *match* `fmt`.
-
-```
-(unpack fmt bytevector)) -> list
-```
-
-`fmt` is a configuration string that must match the underlying record format. It
-only support integral types `bBhHiIlLqQr` and variable length strings `S`. See
-[format types](http://source.wiredtiger.com/2.6.1/schema.html#schema_format_types)
-for more information.
