@@ -393,7 +393,7 @@
             (code (foreign-function (session-handle session) %uri *NULL* %config double-pointer)))
        (if (eq? code 0)
            (make make-cursor make-cursor-structure pointer 20)
-           (let ((message (format #false "(cursor-open ~s ~s)" uri config)))
+           (let ((message (format #false "(cursor-open ~a ~s ~s)" session uri config)))
              (wiredtiger-string-error message code)))))))
 
 (define*-public (cursor-open session uri #:optional (config ""))
@@ -624,3 +624,12 @@
 
 (define-public (cursor-close cursor)
   ((%cursor-close cursor)))
+
+;;; helper for reseting cursors should be in wiredtiger
+;; @@@: emacs: (put 'with-cursor 'scheme-indent-function 1)
+(define-syntax-rule (with-cursor cursor e ...)
+  (let ((out e ...))
+    (cursor-reset cursor)
+    out))
+
+(export with-cursor)
