@@ -16,7 +16,7 @@ And more...
 ## Informations
 
 - Language: [GNU Guile](https://www.gnu.org/software/guile/)
-- Tested with [wiredtiger](http://wiredtiger.com) 2.6.1
+- Tested with [wiredtiger](http://wiredtiger.com) **2.6.2**
 - License: GPL2+ (same as wiredtiger)
 - Join us at **irc.freenode.net#guile** for support.
 - Mailling list: [guile-users](https://www.gnu.org/software/guile/community.html)
@@ -73,7 +73,7 @@ with SQLite.
 
 wiredtiger **does not work on 32 bits architectures**.
 
-It was tested with wiredtiger `2.6.1` but might work with future versions.
+It was tested with wiredtiger `2.6.2` but might work with future versions.
 
 You need to install wiredtiger with the usual
 `./configure && make && make install` cli dance. If you prefer to use git:
