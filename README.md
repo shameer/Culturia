@@ -82,8 +82,8 @@ You need to install wiredtiger with the usual
 git clone https://github.com/wiredtiger/wiredtiger.git
 ```
 
-You also need a recent version of [GNU Guile](https://www.gnu.org/software/guile/) (tested with 2.0.11). It's available
-in most GNU/Linux distributions.
+You also need a recent version of [GNU Guile](https://www.gnu.org/software/guile/)
+(tested with 2.0.11). It's available in most GNU/Linux distributions.
 
 ## How to contribute
 
