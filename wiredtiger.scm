@@ -215,6 +215,7 @@
   compact
   drop
   log-printf
+  reset
   rename
   salvage
   truncate
@@ -253,9 +254,10 @@
             ;; FIXME: add support for error_handler
             (code (foreign-function (connection-handle connection) *NULL* %config double-pointer)))
        (if (eq? code 0)
-           (make make-session make-session-structure pointer 22)
+           (make make-session make-session-structure pointer 23)
            (let ((message (format #false "(session-open ~s ~s)" connection config)))
              (wiredtiger-string-error message code)))))))
+
 
 (define*-public (session-open connection #:optional (config ""))
   ((%session-open connection) config))
