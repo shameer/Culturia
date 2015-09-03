@@ -18,6 +18,7 @@
 
 (use-modules (srfi srfi-9))  ;; records
 (use-modules (srfi srfi-9 gnu))  ;; set-record-type-printer!
+(use-modules (srfi srfi-26)) ;; cut
 
 (use-modules (rnrs bytevectors))
 
@@ -89,8 +90,9 @@
 ;;: utils
 
 (define (make constructor constructor-structure pointer size)
-  "Convert a POINTER to a structure of SIZE into a record
-   using CONSTRUCTOR and CONSTRUCTOR-STRUCTURE"
+  "Convert a POINTER to a structure of SIZE and into a record
+   using CONSTRUCTOR and where the structure is wrapped using 
+   CONSTRUCTOR-STRUCTURE"
   (let* ((pointer (make-pointer (array-ref pointer 0)))
          (array (pointer->bytevector pointer size 0 'u64))
          (structure (apply constructor-structure (map make-pointer (array->list array)))))
@@ -132,7 +134,7 @@
 (set-record-type-printer! <connection>
                           (lambda (record port)
                             (format port
-                                    "<session 0x~x>"
+                                    "<connection 0x~x>"
                                     (pointer-address (connection-handle record)))))
 
 ;; record holding structure pointers
@@ -158,7 +160,7 @@
    (int (wiredtiger* "wiredtiger_open") *pointer* *pointer* *pointer* *pointer*)
    (lambda (foreign-function home config)
      (let* (;; init a double pointer
-            (pointer #u64(0))
+            (pointer (u64vector 0))
             (double-pointer (bytevector->pointer pointer))
             ;; convert arguments to c types
             (%home (string->pointer home))
@@ -452,16 +454,6 @@
 
 
 ;;; set procedures
-
-;;;
-;;; Item
-;;;
-
-(define (make-item bv)
-  (bytevector->pointer (list->u64vector (list (pointer-address (bytevector->pointer bv))
-                                              (bytevector-length bv) 0 0 0))))
-
-(use-modules (srfi srfi-26)) ;; cut
 
 
 (define make-string-pointer
