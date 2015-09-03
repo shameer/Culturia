@@ -350,7 +350,7 @@
 
 ;; record holding structure pointers
 (define-record-type* <cursor-structure>
-  cursor
+  session
   uri
   key-format
   value-format
@@ -427,7 +427,7 @@
                  (append out (list ((assoc-ref *item->value* (car formats)) (car pointers)))))))))
 
 (define-public (cursor-key-ref cursor)
-  (let* ((args (map (lambda (_) #u64(0 0 0 0 0)) (string->list (cursor-key-format cursor))))
+  (let* ((args (map (lambda (_) (u64vector 0)) (string->list (cursor-key-format cursor))))
          (args* (append (list (cursor-handle cursor)) (map bytevector->pointer args)))
          (signature (map (lambda (_) *pointer*) args*))
          (proc (pointer->procedure int
@@ -438,8 +438,10 @@
 
 
 (define-public (cursor-value-ref cursor)
-  (let* ((args (map (lambda (_) #u64(0 0 0 0 0)) (string->list (cursor-value-format cursor))))
-         (args* (append (list (cursor-handle cursor)) (map bytevector->pointer args)))
+  (let* ((args (map (lambda ignore (u64vector 0))
+                    (string->list (cursor-value-format cursor))))
+         (args* (append (list (cursor-handle cursor))
+                        (map bytevector->pointer args)))
          (signature (map (lambda (_) *pointer*) args*))
          (proc (pointer->procedure int
                                    (cursor-structure-value-ref (cursor-structure cursor))
@@ -457,15 +459,20 @@
 
 (define (make-item bv)
   (bytevector->pointer (list->u64vector (list (pointer-address (bytevector->pointer bv))
-                                                       (bytevector-length bv)
-                                                       0
-                                                       0
-                                                       0))))
+                                              (bytevector-length bv) 0 0 0))))
 
-(define *format->pointer* `((#\S . ,(lambda (value) (bytevector->pointer
-                                                     (string->bytevector (string-append value "\0")
-                                                                         "utf-8"))))
-                             (#\Q . ,(lambda (value) (make-pointer value)))))
+(use-modules (srfi srfi-26)) ;; cut
+
+
+(define make-string-pointer
+  (compose bytevector->pointer
+           (cut string->bytevector <> "utf-8")
+           (cut string-append <> "\0")))
+
+
+(define *format->pointer* `((#\S . ,make-string-pointer)
+                            (#\Q . ,make-pointer)))
+
 
 (define (formats->items formats values)
   (let loop ((formats (string->list formats))
@@ -487,10 +494,11 @@
                                    signature)))
     (apply proc args)))
 
+
 (define-public (cursor-value-set cursor . value)
   (let* ((args (append (list (cursor-handle cursor)) (formats->items (cursor-value-format cursor) value)))
          (signature (map (lambda (_) *pointer*) args))
-         (proc (pointer->procedure int
+         (proc (pointer->procedure int 
                                    (cursor-structure-value-set (cursor-structure cursor))
                                    signature)))
     (apply proc args)))
