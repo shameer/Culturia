@@ -91,7 +91,7 @@
 
 (define (make constructor constructor-structure pointer size)
   "Convert a POINTER to a structure of SIZE and into a record
-   using CONSTRUCTOR and where the structure is wrapped using 
+   using CONSTRUCTOR and where the structure is wrapped using
    CONSTRUCTOR-STRUCTURE"
   (let* ((pointer (make-pointer (array-ref pointer 0)))
          (array (pointer->bytevector pointer size 0 'u64))
@@ -106,7 +106,8 @@
 (define wiredtiger* (dynamic-link* wiredtiger))
 
 
-(define	WT_NOTFOUND -31803)
+(define-public WT_NOTFOUND -31803)
+
 
 ;;
 ;; (wiredtiger-error-string code)
@@ -178,7 +179,7 @@
    (int  (connection-structure-close (connection-structure connection)) *pointer* *pointer*)
    (lambda (foreign-function config)
      (let* (;; init a double pointer
-            (pointer #u64(0))
+            (pointer (u64vector 0))
             (double-pointer (bytevector->pointer pointer))
             ;; convert arguments to c types
             (%config (string->pointer config))
@@ -248,7 +249,7 @@
    (int  (connection-structure-open-session (connection-structure connection)) *pointer* *pointer* *pointer* *pointer*)
    (lambda (foreign-function config)
      (let* (;; init a double pointer
-            (pointer #u64(0))
+            (pointer (u64vector 0))
             (double-pointer (bytevector->pointer pointer))
             ;; convert arguments to c types
             (%config (string->pointer config))
@@ -388,7 +389,7 @@
    (int (session-structure-cursor-open (session-structure session)) *pointer* *pointer* *pointer* *pointer* *pointer*)
    (lambda (foreign-function uri config)
      (let* (;; init a double pointer
-            (pointer #u64(0))
+            (pointer (u64vector 0))
             (double-pointer (bytevector->pointer pointer))
             ;; convert arguments to c types
             (%uri (string->pointer uri))
@@ -414,7 +415,8 @@
 
 
 (define *item->value* `((#\S . ,item->string)
-                        (#\Q . ,item->integer)))
+                        (#\Q . ,item->integer)
+                        (#\r . ,item->integer)))
 
 (define (pointers->scm formats pointers)
   (let loop ((formats (string->list formats))
@@ -463,8 +465,8 @@
 
 
 (define *format->pointer* `((#\S . ,make-string-pointer)
-                            (#\Q . ,make-pointer)))
-
+                            (#\Q . ,make-pointer)
+                            (#\r . ,make-pointer)))
 
 (define (formats->items formats values)
   (let loop ((formats (string->list formats))
@@ -490,7 +492,7 @@
 (define-public (cursor-value-set cursor . value)
   (let* ((args (append (list (cursor-handle cursor)) (formats->items (cursor-value-format cursor) value)))
          (signature (map (lambda (_) *pointer*) args))
-         (proc (pointer->procedure int 
+         (proc (pointer->procedure int
                                    (cursor-structure-value-set (cursor-structure cursor))
                                    signature)))
     (apply proc args)))
@@ -557,7 +559,7 @@
    (int (cursor-structure-search-near (cursor-structure cursor)) *pointer* *pointer*)
    (lambda (foreign-function)
      (let* (;; init a integer pointer
-            (integer #u64(0))
+            (integer (u64vector 0))
             (pointer (bytevector->pointer integer))
             ;; call the foreign function
             (code (foreign-function (cursor-handle cursor) pointer)))
@@ -630,7 +632,7 @@
 ;;; helper for reseting cursors should be in wiredtiger
 ;; @@@: emacs: (put 'with-cursor 'scheme-indent-function 1)
 (define-syntax-rule (with-cursor cursor e ...)
-  (let ((out e ...))
+  (let ((out (begin e ...)))
     (cursor-reset cursor)
     out))
 
