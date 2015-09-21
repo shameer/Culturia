@@ -1,96 +1,45 @@
-# guile-wiredtiger 0.2
+# Culturia
 
+Culturia is a prototype backing storage for [OpenCog](http://opencog.org/)
+written using [Guile](https://www.gnu.org/software/guile/) and using
+[wiredtiger](http://wiredtiger.com/).
 
-## Build your own database
+This software is free software work licensed under the AfferoGPLv3.
 
-- ACID
-- NoSQL
-- networkless
-- automatic index
-- multithread support
-- ordered key/value store
+## The name
 
-And more...
+The name is a reference to [Culture and Empire by Pieter Hintjens](http://cultureandempire.com).
 
+## Goals
 
-## Informations
+Prototype a backend storage for [AtomSpace](http://wiki.opencog.org/w/AtomSpace)
+using wiredtiger and Guile.
 
-- Language: [GNU Guile](https://www.gnu.org/software/guile/)
-- Tested with [wiredtiger](http://wiredtiger.com) **2.6.2**
-- License: GPL2+ (same as wiredtiger)
-- Join us at **irc.freenode.net#guile** for support.
-- Mailling list: [guile-users](https://www.gnu.org/software/guile/community.html)
-- Author: [amirouche](mailto:amirouche@hypermove.net)
+- Handle bigger than RAM databases on a single node 
+- Implement the current AtomSpace features 
+- Implement Hierarchical AtomSpaces cf. Multiple AtomSpaces 
+- Implement spacio-temporal indices
 
+And implement if there is interest a version control system (VCS).
 
-## (use-modules (wiredtiger))
+### Sub goals
 
-Create the `/tmp/wt` directory before running the following example:
+- Prepare a design that can be transposed to C/C++
+- Prepare a design that can be transposed to a distributed key/value store 
 
-```scheme
-(define connection (pk (connection-open "/tmp/wt" "create")))
-(define session (pk (session-open connection)))
+### Stretch goals
 
-;; create a table
-(session-create session "table:nodes" "key_format=i,value_format=S")
+- Fully API compatible with OpenCog
+- Create a mini-opencog that is easy to study and hack
+- Solve NLP tasks using opencog principles to get a better understand of opencog
+- Create a feedback loop pipeline on top of wikibase and other wikis
+- Explore program generation 
 
-;; open a cursor over that table
-(define cursor (pk (cursor-open session "table:nodes")))
+### Side goals
 
-;; start a transaction and add a record
-(session-transaction-begin session "isolation=\"snapshot\"")
-(cursor-key-set cursor 42)
-(cursor-value-set cursor "The one true number!")
-(cursor-insert cursor)
-(session-transaction-commit session)
+Things that i'd like to do:
 
-(cursor-reset cursor)
-(cursor-next cursor)
-(pk (cursor-key-ref cursor))
-(pk (cursor-value-ref cursor))
-(cursor-close cursor)
-(session-close session)
-(connection-close connection)
-```
-
-## Kesako wiredtiger?
-
-At the very core, it's a configurable ordered key/value store, column aware,
-with global transactions.
-
-wiredtiger is a versatile database built by the engineers who created
-Oracle Berkeley Database (formely known as Sleepycat Database and bsddb)
-to be the best of its kind taking advantage of new hardwares.
-
-It's not only a database. With wiredtiger you can build fine tuned
-databases and competitive generic databases like mysql or mongodb.
-
-It can provide a performance boost for your application but also simplify
-its design by using a schema that is simpler than the one you would use
-with SQLite.
-
-## Installation
-
-wiredtiger **does not work on 32 bits architectures**.
-
-It was tested with wiredtiger `2.6.2` but might work with future versions.
-
-You need to install wiredtiger with the usual
-`./configure && make && make install` cli dance. If you prefer to use git:
-
-```
-git clone https://github.com/wiredtiger/wiredtiger.git
-```
-
-You also need a recent version of [GNU Guile](https://www.gnu.org/software/guile/)
-(tested with 2.0.11). It's available in most GNU/Linux distributions.
-
-## How to contribute
-
-Send me a mail or patch. But before doing anything with guile-wiredtiger you are
-warmly advised to come to #guile and discuss :)
-
-## Support
-
-For any question reach us via IRC at **irc.freenode.net#guile** for support. Or
-via the [users mailling list](https://www.gnu.org/software/guile/community.html).
+- Fully implement Tinkerpop Gremlin query DSL
+- Explore interaction between pattern matching and Gremlin
+- Implement Earley parser to do pattern matching
+- Make it easier to work with, like allow mutability and add properties to atoms. 

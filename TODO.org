@@ -1,0 +1,5 @@
+
+* wiredtiger
+** implement configuration in scheme instead of wiredtiger configuration string
+** add support of scm->bytevector and bytevector->scm in packing
+** implement a packing function that support float (and bignum?)
