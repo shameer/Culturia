@@ -1,4 +1,7 @@
-
+* culturia
+** use projections "index:poptable:country_plus_year(id)"
+** redo transient
+** mock gremlin api
 * wiredtiger
 ** implement configuration in scheme instead of wiredtiger configuration string
 ** add support of scm->bytevector and bytevector->scm in packing

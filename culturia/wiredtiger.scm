@@ -14,7 +14,7 @@
 
 ;; You should have received a copy of the GNU General Public License
 ;; along with guile-wiredtiger.  If not, see <http://www.gnu.org/licenses/>
-(define-module (wiredtiger))
+(define-module (culturia wiredtiger))
 
 (use-modules (srfi srfi-9))  ;; records
 (use-modules (srfi srfi-9 gnu))  ;; set-record-type-printer!
