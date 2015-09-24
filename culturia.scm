@@ -4,6 +4,7 @@
 
 (use-modules (srfi srfi-9))  ;; records
 (use-modules (srfi srfi-9 gnu))  ;; set-record-type-printer!
+(use-modules (srfi srfi-19)) ;; date
 (use-modules (srfi srfi-26)) ;; cut
 
 (use-modules (ice-9 match))
@@ -15,9 +16,21 @@
 ;; helper for managing exceptions
 
 (define (make-exception name)
-  (gensym (string-append "culturia-" (symbol->string name))))
+  "Generate a unique symbol prefixed with NAME"
+  (gensym (string-append "culturia-" name)))
 
-(define *exception* (make-exception 'exception))
+(define *exception* (make-exception "culturia-exception"))
+
+(define (raise message . rest)
+  "shorthand to throw EXCEPTION with MESSAGE formated with REST"
+  (throw *exception* (apply format (append (list #false message) rest))))
+
+(define (Oops!)
+  (raise "Oops!"))
+
+
+
+;; ---
 
 ;;;
 ;;; srfi-99
@@ -56,6 +69,59 @@
 
 ;; ---
 
+;;; recursive datastructure
+
+
+(define-record-type <tree>
+  (make-tree value children max)
+  tree?
+  (value tree-value)
+  (children tree-children-ref tree-children-set!)
+  (max tree-max-ref tree-max-set!))
+
+(export make-tree)
+
+(define-public (create-tree value)
+  (make-tree value '() 0))
+
+
+(define-public (tree-ref tree value)
+  (if (eq? (tree-value tree) value)
+      tree
+      (let loop ((children (tree-children-ref tree)))
+        (if (null? children)
+          #nil
+          (let ((candidate (tree-ref (car children) value)))
+            (if (null? candidate)
+                (loop (cdr children))
+                candidate))))))
+
+
+(define-public (tree-append! tree parent value)
+  (let ((node (tree-ref tree parent)))
+    (when (null? node)
+      (raise "tree: no node ~a found in ~a" parent tree))
+    (tree-children-set! node
+                        (cons (create-tree value) (tree-children-ref node)))
+    (when (< (tree-max-ref tree) value)
+      (tree-max-set! tree value))))
+
+
+(define-public (tree-path tree value)
+  (define (tree-path-rec tree value)
+    (if (eq? (tree-value tree) value)
+        (list value)
+        (let loop ((children (tree-children-ref tree)))
+          (if (null? children)
+              #nil
+              (let ((candidate (tree-path-rec (car children) value)))
+                (if (null? candidate)
+                    (loop (cdr children))
+                    (cons (tree-value tree) candidate)))))))
+  (reverse (tree-path-rec tree value)))
+
+
+;; ---
 
 ;;;
 ;;; generate-uid
@@ -65,7 +131,7 @@
 
 (set! *random-state* (random-state-from-platform))
 
-(define-public (randome-name exists?)
+(define-public (random-name exists?)
   "Generate a random string made up alphanumeric ascii chars that doesn't exists
    according to `exists?`"
   (define (random-id)
@@ -87,135 +153,190 @@
 
 (define (string->scm value)
   "serialize VALUE with `read` as scheme objects"
-  (with-input-from-string (car (unpack "S" value)) (lambda () (read))))
+  (with-input-from-string value (lambda () (read))))
 
 (define (scm->string value)
   "Write VALUE in a string and return it"
-  (pack "S" (with-output-to-string (lambda () (write value)))))
+  (with-output-to-string (lambda () (write value))))
 
-;;
+;; --
+
+;;; <culturia> is handle over the underlying backing store
 
 (define-record-type* <culturia>
   connection
   session
-  ;; <ego>
-  ego
-  ego-append  ;; secondary cursor for insert
-  ego-name  ;; third cursor for name look of egos
-  ;; <fact> cursors
-  facts  ;; main cursor all the facts used for direct access via uid
-  facts-append  ;; secondary cursor for insert
-  deleted ;; cursor over the deleted facts index
-  index  ;; main index to explore the hyper culture taking into account vcs branch
-  types  ;; cursor to fetch facts of given type
-  names  ;; cursor for direct access via (type, name)
+  ;; <revision>
+  revisions
+  revisions-append  ;; secondary cursor for insert
+  revisions-names  ;;
+  revisions-tree
+  ;; <culture>
+  cultures
+  cultures-append  ;; secondary cursor for insert
+  cultures-names  ;; third cursor for name look of egos
+  ;; <atom> cursors
+  atoms  ;; main cursor all the atoms used for direct access via uid
+  atoms-append  ;; secondary cursor for insert
+  atoms-revisions
+  atoms-cultures
+  atoms-names
+  atoms-type-names
   ;; <arrow> cursor
-  arrows  ;; cursor for fetching outgoings set
-  reversed  ;; cursor for fetching incomings set
+  arrows
+  arrows-append
+  arrows-outgoings ;; cursor for fetching outgoings set
+  arrows-incomings
   )
+
 
 (set-record-type-printer! <culturia>
                           (lambda (record port)
                             (format port
-                                    "<culturia 0x~x ~s>"
-                                    (pointer-address (connection-handle record))
-                                    (connection-structure-get-home (connection-handle record)))))
+                                    "<culturia ~s>"
+                                    (culturia-connection record))))
 
 ;; ---
 
-(define (%make-culturia path)
-  (let ((connection (connection-open path "create"))
-        (session (session-open connection))
-        (columns (string-append "("
-                                "uid,"
-                                "culture-path,"
-                                "revision,"
-                                "ego-path,"
-                                "type,"
-                                "name,"
-                                "data"
-                                "deleted"
-                                ")")))
 
-    ;; create table to store ego informations
+(define (culturia-init connection)
+  (let ((session (session-open connection)))
+    ;; create table to store revision informations
     (session-create session
-                    "table:ego"
+                    "table:revisions"
                     (string-append "key_format=r,"
-                                   "value_format=SQQS,"
-                                   "columns=(uid,name,parent,revision,comment)"))
-    
-    ;; this index is useful to retrieve egos by name
-    (session-create session "index:ego:names" "columns=(name,uid)")
-    
-    ;; create a main table to store fact informations
+                                   "value_format=QSS,"
+                                   "columns=(uid,parent,name,comment)"))
+
+    ;; this index is useful to retrieve revisions by name
+    (session-create session "index:revisions:names" "columns=(name)")
+
+    ;; create table to store culture informations
     (session-create session
-                    "table:facts"
+                    "table:cultures"
                     (string-append "key_format=r,"
-                                   "value_format=uQuSSSQ,"
+                                   "value_format=QQSS,"
+                                   "columns=(uid,revision,parent,name,comment)"))
+    ;; this index is useful to retrieve cultures by name
+    ;; XXX: not sure it's useful since at runtime the cultures of a given
+    ;; revision are cached
+    (session-create session "index:cultures:names" "columns=(name)")
+
+    ;; create a main table to store atom informations
+    (session-create session
+                    "table:atoms"
+                    (string-append "key_format=r,"
+                                   "value_format=QQQSSS,"
                                    "columns="
-                                   columns))
+                                   (string-append "("
+                                                  "uid,"
+                                                  "revision,"
+                                                  "deleted,"
+                                                  "culture,"
+                                                  "type,"
+                                                  "name,"
+                                                  "data,"
+                                                  ")")))
 
     ;; create related indices
 
-    ;; this index is useful to check if a fact is deleted in a given ego
-    (session-create session "index:facts:deleted" "columns=(ego_path,deleted,uid)")
-    
-    ;; this index is useful to retrieve facts for given ego and a given
-    ;; culture
-    (session-create session "index:facts:index" "columns=(ego-path,uid)")
-    (session-create session "index:facts:index" "columns=(culture-path,uid)")
+    ;; this index is useful to retrieve existing atoms in a given workspace and a given culture
+    (session-create session "index:atoms:revisions" "columns=(revision)")
+    (session-create session "index:atoms:cultures" "columns=(culture)")
 
-    ;; this index is useful to retrieve a set of facts of given a type
-    (session-create session "index:facts:types" "columns=(type,uid)")
-
-    ;; this index is useful to retrieve a <fact> of given type and name
-    ;; XXX: (type, name) must be unique
-    (session-create session "index:facts:names" "columns=(type,name,uid)")
-
+    ;; this index is useful to retrieve atom of given type name
+    (session-create session "index:atoms:types" "columns=(type)")
+    ;; this index is useful to retrieve an <atom> of given type and name
+    (session-create session "index:atoms:type-names" "columns=(type,name)")
 
     ;; create a main table to store <arrow>
     (session-create session
                     "table:arrows"
-                    (string-append "key_format=uuQQQ,"
-                                   "value_format=u,"
-                                   "columns=(ego_path,culture_path,revision,start,end)"))
-    ;; this index is useful to traverse arrows in reverse ie. retrieve incoming set
-    (session-create session "index:arrows:reversed" "columns=(ego_path,culture_path,revision,end,start)")
+                    (string-append "key_format=r,"
+                                   "value_format=QQQQ,"
+                                   "columns=(uid,revision,deleted,start,end)"))
+    ;; this index is useful to traverse outgoing set
+    (session-create session "index:arrows:outgoings" "columns=(start)")
+    ;; this index is useful to traverse incoming set
+    (session-create session "index:arrows:incomings" "columns=(end)")
 
-    (make-culturia connection
-                   session
-                   ;; <ego>
-                   (cursor-open session "table:ego")
-                   (cursor-open session "table:ego" "append")
-                   ;; <fact> cursors
-                   (cursor-open session "table:facts")
-                   (cursor-open session "table:facts" "append")
-                   (cursor-open session "index:facts:deleted")
-                   (cursor-open session "index:facts:index")
-                   (cursor-open session "index:facts:types")
-                   (cursor-open session "index:facts:names")
-                   ;; <arrow> cursor
-                   (cursor-open session "index:facts:arrows")
-                   (cursor-open session "index:facts:reversed"))))
+    (let ((revisions (cursor-open session "table:revisions"))
+          (revisions-tree (create-tree 0)))
+      ;; build revisions tree
+      (cursor-reset revisions)
+      (let loop ()
+        (if (not (cursor-next revisions))
+            revisions-tree
+            (match (append (cursor-key-ref revisions) (cursor-value-ref revisions))
+              ((uid revision parent _ _)
+               (tree-append! revisions-tree parent uid)
+               (loop))
+              (_ (Oops!)))))
+
+      (make-culturia connection
+                     session
+                     ;; <revision>
+                     revisions
+                     (cursor-open session "table:revisions" "append")
+                     (cursor-open session "index:revisions:names(uid,parent,comment)")
+                     revisions-tree
+                     ;; <culture>
+                     (cursor-open session "table:cultures")
+                     (cursor-open session "table:cultures" "append")
+                     (cursor-open session "index:cultures:names(uid,revision,parent,comment)")
+                     ;; <atom> cursors
+                     (cursor-open session "table:atoms")
+                     (cursor-open session "table:atoms" "append")
+                     (cursor-open session "index:atoms:revisions(uid,deleted)")
+                     (cursor-open session "index:atoms:cultures(uid,revision,deleted)")
+                     (cursor-open session "index:atoms:types(uid,revision,culture,deleted)")
+                     (cursor-open session "index:atoms:type-names(uid,revision,culture,deleted)")
+                     ;; <arrow> cursor
+                     (cursor-open session "table:arrows")
+                     (cursor-open session "table:arrows" "append")
+                     (cursor-open session "index:arrows:outgoings(uid,revision,deleted)")
+                     (cursor-open session "index:arrows:incomings(uid,revision,deleted)")))))
 
 
-;; FIXME: add path check and create the initial ego
-(define (create-culturia path)
-  (%make-culturia path))
+(define-public (create-culturia path)
+  "Create and initialize a culturia database at PATH and return a <culturia>"
 
-(define (open-culturia path)
-  (%make-culturia path))
+  (define (now)
+    (date->string (current-date) "~Y-~m-~d ~H:~M:~s"))
 
-;; ---
+  (define (path-exists? path)
+    "Return #true if path is a file or directory. #false if it doesn't exists"
+    (access? path F_OK))
+
+  (when (path-exists? path)
+    (raise "There is already something at ~a. Use (open-culturia path) instead" path))
+
+  (mkdir path)
+  (open-culturia path))
+
+
+(define-public (open-culturia path)
+  "Initialize a culturia database at PATH; creating if required the tables and
+   indices. Return a <culturia> record."
+  (let ((connection (connection-open path "create")))
+    (culturia-init connection)))
+
+
+(define-public (culturia-close culturia)
+  (connection-close (culturia-connection culturia)))
+
 
 (define-public (culturia-begin culturia)
   (session-transaction-begin (culturia-session culturia)))
 
+
 (define-public (culturia-commit culturia)
   (session-transaction-commit (culturia-session culturia)))
 
+
 (define-public (culturia-rollback culturia)
   (session-transaction-rollback (culturia-session culturia)))
+
 
 (define-syntax-rule (with-transaction culturia e ...)
   (begin
@@ -223,118 +344,159 @@
     e ...
     (culturia-commit culturia)))
 
+
 (export with-transaction)
 
+
 ;; ---
 
-;;; An <ego> is the equivalent of workspace in git
-;;
-;; An ego is associated with a name, a branch and a revision.
-;; ego informations are stored in the `bigbang` culture
-;; extra information is stored in wiredtiger to speed up
-;; querying.
-;;
-;; In user code, using an <ego> is the only way to access a <culture>.
-;;
+;;; <revision>
 
 
-(define-record-type* <ego> culturia uid name parent revision)
+(define-record-type* <revision> culturia uid parent name comment path cultures-tree)
 
 
-(define (checkout-ego culturia name #:optional (revision #nil))
-  (when revision
-    (throw *exception* "wanna play? this is not supported yet!"))
-  (let ((cursor (culturia-ego-name culturia)))
-    (cursor-set-key cursor name 0)
-    (when (eq? (cursor-searh cursor) WT_NOTFOUND)
-      (throw *exception* (format #f "~a has no ego named ~s" name revision)))
-    (let ((key (cursor-value-ref cursor))
-          (value (cursor-value-ref cursor)))
-      (match (list key value)
-        (((name uid) (name revision parent))
-         (make-ego culturia uid name parent revision))
-        (_ (throw *exception* "I swear I don't know what I'm doing"))))))
+(define (make-cultures-tree culturia revisions)
+  (let ((cursor (culturia-cultures culturia))
+        (cultures-tree (create-tree 0)))
+    (cursor-reset cursor)
+    (let loop ()
+      (when (cursor-next cursor)
+        (match (append (cursor-key-ref cursor) (cursor-value-ref cursor))
+          ((uid revision parent name comment)
+           ;; XXX: this does not handle
+           ;; - deleted culture
+           ;; - updated culture
+           (when (list-index revisions revision)
+             (tree-append! cultures-tree parent uid))
+           (loop))
+          (_ (Oops!)))))
+    cultures-tree))
 
 
-(define (ego-branch name parent comment)
-  (let ((cursor (culturia-ego-append culturia))
-        (parent (ego-uid parent)))
-    (cursor-set-value cursor name parent revision comment)
+(define-public (checkout-revision culturia name)
+  (let ((cursor (culturia-revisions-names culturia)))
+    ;; look for revision by name
+    (cursor-key-set cursor name)
+    (if (cursor-search cursor)
+        ;; retrieve revision information
+        (match (append (cursor-key-ref cursor) (cursor-value-ref cursor))
+          ((name uid parent name comment)
+           (let* ((path (tree-path (culturia-revision-tree culturia) uid))
+                  (cultures-tree (make-cultures-tree culturia path)))
+             (make-revision culturia uid parent name comment path cultures-tree)))
+          (_ (Oops!)))
+        ;; otherwise create a new revision
+        ;; FIXME: done unconditionally
+        (let ((cursor (culturia-revisions-append culturia)))
+          (cursor-value-set cursor 0 name "*branch*")
+          (cursor-insert cursor)
+          (let ((uid (cursor-key-ref cursor))
+                (revisions-tree (culturia-revisions-tree culturia)))
+            (tree-append! revisions-tree 0 uid)
+            (make-revision culturia
+                           uid
+                           0
+                           name
+                           "*branch*"
+                           (list uid)
+                           (create-tree 0)))))))
+  
+;; FIXME: debug
+(define-public (revision-commit revision comment)
+  (let* ((culturia (revision-culturia revision))
+         (revisions (culturia-revisions-append culturia))
+         (cultures (culturia-cultures culturia))
+         (parent (revision-uid revision))
+         (cultures-tree (create-tree 0)))
+    ;; add revision to the storage
+    (cursor-value-set revisions parent name comment)
+    (cursor-insert revisions)
+    (let ((culturia (revision-culturia revision))
+          (uid (cursor-key-ref cursor))
+          (path (cons uid (revision-path revision)))
+          ;; create a <revision>
+          ;; FIXME: replace with a <tree> procedure (tree-copy tree)
+          (cultures-tree (make-cultures-tree culturia path)))
+      (make-revision culturia uid parent name comment path cultures-tree))))
+
+
+;; ---
+
+
+(define-record-type* <culture> revision uid parent name comment)
+
+
+(define (create-culture revision name)
+  ;; FIXME: add culture to revision cache
+  (let* ((culturia (revision-culturia revision))
+         (cursor (culturia-cultures-append culturia))
+         (cultures-tree (revision-cultures-tree revision)))
+    ;; add the culture to the cultures tables
+    (cursor-value-ref (1+ (revision-uid revision)) 0 name "*culture*")
     (cursor-insert cursor)
-    (make-ego culturia (cursor-key-ref cursor) name parent revision)))
+    ;; update cultures-tree
+    (let ((uid (cursor-key-ref cursor)))
+      (tree-append! cultures-tree 0 uid)
+      (make-culture revision uid 0 name "*culture*"))))
 
 
-(define (ego-commit ego comment)
-  (ego-branch "%commit%" ego comment))
+(define (checkout-culture revision name)
+  ;; FIXME: this doesn't take into account the revision...
+  (let ((cursor (culturia-cultures-names culturia)))
+    (cursor-key-set cursor name)
+    (when (cursor-search cursor)
+      (match (cursor-value-ref cursor)
+        [(uid _ parent comment)
+         (make-culture revision uid parent name comment)]))))
 
 
-(define (ego-fact-ref/uid ego uid))
+(define (culture-atoms culture))
 
-
-(define (ego-fact-ref/type+name ego type name))
-
-
-(define (ego-culture-ref ego name)
-  ;; FIXME: check that the culture exists
-  (make-culture ego name))
-
-
-;; ---
-
-;;; A <culture> is a set of interconnected <fact>
-;;
-;; FIXME: how is related to ego
-;;
-
-(define-record-type* <culture> ego name)
-
-(define (create-culture ego name))
-
-(define (culture-delete)
-  ;; delete all the facts 
-
-;; ---
-
-(define-record-type <fact>
-  (make-fact culture uid type name data outgoings incomings)
-  (culture fact-culture)
-  (uid fact-uid)
-  (type fact-type)
-  (name fact-name)
-  (data fact-data-ref fact-data-set)
-  (outgoings fact-outgoings-ref fact-outgoings-set)
-  (incomings fact-incomings-set fact-incomings-set))
-
-
-(define (create-fact culture type name data)
-  (let* ((ego (culture-ego culture))
-         (cursor (culturia-facts-append (ego-culturia ego))))
-    (cursor-set-value (culture-path culture)
-                      (ego-revision ego)
-                      (ego-path-suffix ego)
-                      type
-                      name
-                      (scm->string data)
-                      #false)
-    (cursor-insert cursor)
-    (make-fact culture (cursor-key-ref cursor) type name data '() '())))
-
-
-(define (fact-delete culture fact)
-  ;; mark the fact as deleted for the current ego (revision+branch)
-  (let* ((ego (culture-ego culture))
-         (cursor (culturia-facts (ego-culturia ego))))
-    (cursor-set-key cursor (fact-uid fact))
-    (cursor-set-value (culture-path culture)
-                      (ego-revision ego)
-                      (ego-path-suffix ego)
-                      (fact-type type)
-                      (fact-name name)
-                      (scm->string (fact-data fact))
-                      #true)
-    (cursor-update cursor)))
 
   
-;; ---
+;; ;; ---
 
-(define-record-type* <culture> culturia uid name)
+;; (define-record-type <atom>
+;;   (make-atom culture uid type name data outgoings incomings)
+;;   (culture atom-culture)
+;;   (uid atom-uid)
+;;   (type atom-type)
+;;   (name atom-name)
+;;   (data atom-data-ref atom-data-set)
+;;   (outgoings atom-outgoings-ref atom-outgoings-set)
+;;   (incomings atom-incomings-set atom-incomings-set))
+
+
+;; (define (create-atom culture type name data)
+;;   (let* ((workspace (culture-workspace culture))
+;;          (cursor (culturia-atoms-append (workspace-culturia workspace))))
+;;     (cursor-set-value (culture-path culture)
+;;                       (workspace-revision workspace)
+;;                       (workspace-path-suffix workspace)
+;;                       type
+;;                       name
+;;                       (scm->string data)
+;;                       #false)
+;;     (cursor-insert cursor)
+;;     (make-atom culture (cursor-key-ref cursor) type name data '() '())))
+
+
+;; (define (atom-delete culture atom)
+;;   ;; mark the atom as deleted for the current workspace (revision+branch)
+;;   (let* ((workspace (culture-workspace culture))
+;;          (cursor (culturia-atoms (workspace-culturia workspace))))
+;;     (cursor-set-key cursor (atom-uid atom))
+;;     (cursor-set-value (culture-path culture)
+;;                       (workspace-revision workspace)
+;;                       (workspace-path-suffix workspace)
+;;                       (atom-type type)
+;;                       (atom-name name)
+;;                       (scm->string (atom-data atom))
+;;                       #true)
+;;     (cursor-update cursor)))
+
+
+;; ;; ---
+
+;; (define-record-type* <culture> culturia uid name)

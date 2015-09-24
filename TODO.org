@@ -1,6 +1,8 @@
 * culturia
 ** use projections "index:poptable:country_plus_year(id)"
 ** redo transient
+** fix open/create culturia need better error handling
+** add datetime to <workspace>
 ** mock gremlin api
 * wiredtiger
 ** implement configuration in scheme instead of wiredtiger configuration string

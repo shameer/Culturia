@@ -1,53 +1,79 @@
-(use-modules (srfi srfi-9))  ;; records
-(use-modules (srfi srfi-9 gnu))  ;; set-record-type-printer!
-(use-modules (srfi srfi-26)) ;; cut
+#!/usr/bin/env guile
+!#
 
-(use-modules (ice-9 match))
-(use-modules (ice-9 format))
-(use-modules (ice-9 optargs))  ;; lambda*
-(use-modules (ice-9 receive))
+(use-modules (srfi srfi-64)) ;; unit test framework
 
-(use-modules (ice-9 match))
+(use-modules (culturia))
 
-;;;
-;;; srfi-99
-;;;
-;;
-;; macro to quickly define immutable records
-;;
-;;
-;; Usage:
-;;
-;;   (define-record-type <abc> field-one field-two)
-;;   (define zzz (make-abc 1 2))
-;;   (abc-field-one zzz) ;; => 1
-;;
 
-(define-syntax define-record-type*
-  (lambda (x)
-    (define (%id-name name) (string->symbol (string-drop (string-drop-right (symbol->string name) 1) 1)))
-    (define (id-name ctx name)
-      (datum->syntax ctx (%id-name (syntax->datum name))))
-    (define (id-append ctx . syms)
-      (datum->syntax ctx (apply symbol-append (map syntax->datum syms))))
-    (syntax-case x ()
-      ((_ rname field ...)
-       (and (identifier? #'rname) (and-map identifier? #'(field ...)))
-       (with-syntax ((cons (id-append #'rname #'make- (id-name #'rname #'rname)))
-                     (pred (id-append #'rname (id-name #'rname #'rname) #'?))
-                     ((getter ...) (map (lambda (f)
-                                          (id-append f (id-name #'rname #'rname) #'- f))
-                                        #'(field ...))))
-         #'(define-record-type rname
-             (cons field ...)
-             pred
-             (field getter)
-             ...))))))
+(test-begin "main")
 
-(define-record-type* <foo> bar baz)
+(test-group "utils"
+  (test-group "tree"
+    (let* ((tree (create-tree 1))
+           (_ (tree-append! tree 1 2))
+           (_ (tree-append! tree 1 3))
+           (_ (tree-append! tree 2 4))
+           (_ (tree-append! tree 4 5))
+           (_ (tree-append! tree 5 6))
+           (_ (tree-append! tree 6 7)))
+      (test-equal (tree-path tree 6) (list 6 5 4 2 1))))
+  )
 
-(define thing (make-foo 1 2))
+;; ---
 
-(match (list thing thing)
-  ((($ <foo> a b) ...) (pk 'ok a b))
-  (_ (pk 'fail)))
+;;; path utils
+
+(define (path-join . rest)
+  "Return the absolute path made of REST. If the first item
+   of REST is not absolute the current working directory
+   will be  prepend"
+  (let ((path (string-join rest "/")))
+    (if (string-prefix? "/" path)
+        path
+        (string-append (getcwd) "/" path))))
+
+(define (path-dfs-walk dirpath proc)
+  (define dir (opendir dirpath))
+  (let loop ()
+    (let ((entry (readdir dir)))
+      (cond
+       ((eof-object? entry))
+       ((or (equal? entry ".") (equal? entry "..")) (loop))
+       (else (let ((path (path-join dirpath entry)))
+               (if (equal? (stat:type (stat path)) 'directory)
+                   (begin (path-dfs-walk path proc)
+                          (proc path))
+                   (begin (proc path) (loop))))))))
+  (closedir dir)
+  (proc (path-join dirpath)))
+
+(define (rmtree path)
+  (path-dfs-walk path (lambda (path)
+                        (if (equal? (stat:type (stat path)) 'directory)
+                            (rmdir path)
+                            (delete-file path)))))
+
+(define-syntax-rule (with-directory path e ...)
+  (begin 
+    (when (access? path F_OK)
+      (rmdir path))
+    e ...
+    (rmtree path)))
+
+
+(test-group "culturia"
+
+  (with-directory "/tmp/culturia"
+                  (let* ((culturia (create-culturia "/tmp/culturia"))
+                         (master (checkout-revision culturia "master")))
+
+                    (pk master)
+                    (culturia-close culturia)
+  
+                  ;; (test-equal "smoke" (list 1 2) (list 1 2))
+                    )
+                  ))
+
+
+(test-end "main")
