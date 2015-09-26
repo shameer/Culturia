@@ -1,11 +1,11 @@
-# Notes About OpenCog Overview
+# OpenCog Sneak Peek
 
 [reference](http://wiki.opencog.org/wikihome/index.php/CogPrime_Overview)
 
 *Large sentence in italic means more or less that I don't understand*
 
-Main goal is to simplify *local cognitive load*, the general rule is to avoid
-creating/opening doors and focus and what are the directions of the project.
+Main goal: simplify *local cognitive load*, the rule is to avoid opening doors
+and focus and what are the directions of the project.
 
 Notes taking algorithm:
 
@@ -18,50 +18,66 @@ Notes taking algorithm:
 
   - simplify wording aka. avoid words I don't know. I'm sorry Yeats. Globish FTW!
   - simplify phrasing aka. less prose more bullets
-  - avoid adjectives that provide no value for direct understanding
+  - avoid adjectives
   - avoid “because X, Y we should Z”  and instead “we must Z”
 
 - glocal (key concept that forward to more general facts)
   - do not cite thing with no prior proper introduction (except glocal)
-  - avoid *text link* to non-wikipedia articles
   - less implementation purity facts like "MOSES handles *much of* procedural
     learning" prefer "MOSES handle procedural learning"
   - less contextualisation like "computationally feasible", "mainstream in IA" etc..
   - focus contextually relevant facts instead of trying to be comprehensive
-  - strip examples (which is not re-used)
+  - strip examples [FIXME: add examples]
 
-A few citations are missing in the original wiki. Look for comma character.
+*A few citations are missing in the original wiki. Look for comma character.*
+
+# New Table Of Content
+
+*Work in progress*
+
+- Introduction
+  - AI vs AGI
+  - {Open,Cog,Prime}
+  - Secret Sauce
+  - Key Claims
+
+- Theory (Pattern Theory of the Mind)
+- Implementation
+  - AtomSpace
+  - Natural Language Pipeline
+  - MOSES
+  - DeSTIN
+  - PLN
+  - ...
+- Applications
+- Roadmap
 
 
-## Introduction
+# Introduction
 
-### AI vs AGI
+## AI vs AGI
 
 AI is really narrow-AI. AGI also know as *Human Level Intelligence* is a revival
 of original AI goals to create a human-like intelligence.
 
+## Theory
+
 ### What's the secret sauce
 
-There is no particular new algorithm or architecture principle [except PLN which
-it's based on previous work].
+*Secret sauce*: Making diverse AI algorithms with diverse background theories
+work together in a *synergetic* and *cooperative* way.
 
-AI algorithms and structures corresponding to different cognitive
-functions have been developed based on divergent background theories. They have
-been tuned for effective performance on different narrow AI tasks in different
-environments. **Making such diverse components work together** in a *synergetic*
-and *cooperative* way is the “secret sauce”. This allows to go beyond what could
-be achieved by an architecture containing the same structures and processes in
-separate “black boxes”.
+*white boxes* instead of *black boxes*.
+
+There is no particular new algorithm or architecture principle.
 
 - *synergy*: the interaction of elements that when combined produce a total
   effect that is greater than the sum of the individual elements, contributions,
   etc.
 
-### What Kind of “Intelligence” is CogPrime Aimed At?
+### What Kind of Intelligence is OpenCog Aimed At?
 
-This is defined by pratical goals. While these are not useful for motivating the
-early steps of AGI research, we intend that a fully realized CogPrime system
-would be able to succeed at them:
+Pratical goals:
 
 - *Turing Test*: the classic, involving passing as a human being in an everyday
    conversation
@@ -75,6 +91,8 @@ would be able to succeed at them:
 - *Artificial Scientist Test*: write and publish original science papers,
    based on ideas conceived by the AI due to its own reading of the literature 
 
+[FIXME: why this paragraph is here? It's key aspect of intelligence but...]
+
 Another important aspect of intelligence is *adaptiveness*: the capability of a
 system to adapt to its environment [recognize similar problems and apply
 previous structure and algorithm] effectively.
@@ -84,35 +102,38 @@ I'll paraphrase  Alan Kay argument “To build the software of the future
 use the ressources of the future”
 [https://www.youtube.com/watch?v=gTAghAJcO1o](The Future doesn't have to be incremental)]
 
-CogPrime is designed toward human-relevant goals and environment. I is also
-expected to have a particular set of intellectual strengths and weaknesses
-different from that of humans.
-
 ### Key Claims
 
-This is a list of claims that the reader must accept to validate that CogPrime
+This is a list of claims that the reader must accept to validate that OpenCog
 approach to AGI is a viable one.
 
 An AGI system must:
 
-- Use much of its resources
-- Represent different kind of knowledge via different kinds of memory: declarative, procedural, episodic, sensory,
-   intentional, attentional. 
-- Use cognitive synergy between different cognitive process to overcome
-   processing bottlenecks. This means that cognitive processus must be able to
-   understand and use the memory of each other.
+- Use much of its *resources*
+- Represent different kind of knowledge via different kinds of *cognitive memory*:
+  - declarative
+  - procedural
+  - episodic
+  - sensory
+  - intentional
+  - attentional
+- Use *cognitive synergy* between different cognitive process to overcome
+  processing bottlenecks. This means that cognitive processus must be able to
+  understand and use the memory of each other.
 - have a global, local and *glocal* memory
 - have sensory data and motoric affordances that roughly emulate those
-   available to humans.
-- must grow/evolve up along a path roughly comparable to that followed by human children. It is not human intelligence man, it learns human intelligence.
-- learning must happend using a mix of spontaneous learning and explicit instricution:
+  available to humans.
+- must grow/evolve up along a path roughly comparable to that followed by human
+  children. It is not human intelligence man, it learns human intelligence.
+- learning must happend using a mix of spontaneous learning and explicit
+  instricution:
    - imitation
    - reinforcement and correction
    - linguistic and nonlinguistic instruction
 - learn human language via built-in NLP facility that can be improved based on
-   experiences. NLP facility is both rules and statistic based
+  experiences. NLP facility must be both rule and statistic based.
 - recognize and represent large-scale pattern in itself called the *cognitive equation*
-   [reference: Chaotic Logic. Plenum, 1994. BibTeX [Goe94]].
+  [reference: Chaotic Logic. Plenum, 1994. BibTeX [Goe94]].
 - upon sustained interaction with an environment in pursuit of goals emerge
    internal knowledge network, including but not limited to:
    - *hierarchical network: representing both a spatiotemporal hierarchy and an
@@ -121,7 +142,7 @@ An AGI system must:
      associativity, roughly aligned with the hierarchical network*
    - *self network which is an approximate micro image of the whole network*
    - *inter-reflecting networks modeling self and others, reflecting a “mirrorhouse” design pattern* [reference: Mirror Neurons, Mirrorhouses, and the Algebraic Structure of the Self GASP08].
-- implement implement a simplicity bias in each cognitive process cf. [Occam’s Razor](https://en.wikipedia.org/wiki/Occam's_razor).
+- implement a simplicity bias in each cognitive process cf. [Occam’s Razor](https://en.wikipedia.org/wiki/Occam's_razor).
 - if supplied with a commonsensically ethical goal system and an intentional
    component based on rigorous uncertain inference, should be able to reliably
    achieve a much higher level of commonsensically ethical behavior than any
