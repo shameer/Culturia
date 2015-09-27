@@ -8,20 +8,6 @@
 
 (test-begin "main")
 
-(test-group "utils"
-  (test-group "tree"
-    (let* ((tree (create-tree 1))
-           (_ (tree-append! tree 1 2))
-           (_ (tree-append! tree 1 3))
-           (_ (tree-append! tree 2 4))
-           (_ (tree-append! tree 4 5))
-           (_ (tree-append! tree 5 6))
-           (_ (tree-append! tree 6 7)))
-      (test-equal (tree-path tree 6) (list 6 5 4 2 1))))
-  )
-
-;; ---
-
 ;;; path utils
 
 (define (path-join . rest)
@@ -55,9 +41,9 @@
                             (delete-file path)))))
 
 (define-syntax-rule (with-directory path e ...)
-  (begin 
+  (begin
     (when (access? path F_OK)
-      (rmdir path))
+      (rmtree path))
     e ...
     (rmtree path)))
 
@@ -65,12 +51,34 @@
 (test-group "culturia"
 
   (with-directory "/tmp/culturia"
-                  (let* ((culturia (create-culturia "/tmp/culturia"))
-                         (master (checkout-revision culturia "master")))
+                  (let* ((culturia (culturia-create "/tmp/culturia"))
+                         (atom (culturia-atom-create culturia "test" "name")))
+                    ;; a few sanity tests
+                    (test-equal "empty outgoings" (atom-outgoings atom) (list))
+                    (test-equal "empty incomings" (atom-incomings atom) (list))
+                    (test-equal "empty assoc" (atom-assoc atom) (list))
 
-                    (pk master)
+                    (let ((idem (culturia-atom-ref/uid culturia (atom-uid atom))))
+                      (test-equal "atom-assoc-equal" (atom-assoc atom) (atom-assoc idem)))
+
+                    (let ((idem (culturia-atom-ref culturia "test" "name")))
+                      (test-equal "culturia-atom-ref/type+name" (atom-uid atom) (atom-uid idem)))
+
+                    (let ((atoms (culturia-atom-ref culturia "test")))
+                      (test-equal "culturia-atom-ref/type" atoms (list (atom-uid atom))))
+
+                    ;;
+                    (atom-assoc-set! atom 'key "value")
+                    (test-equal "atom-assoc-set" (atom-assoc-ref atom 'key) "value")
+
+                    (let ((other (culturia-atom-create culturia "test" "other")))
+                      (atom-link atom other)
+                      (test-equal "not empty outgoings" (atom-outgoings atom) (list (atom-uid other)))
+                      (test-equal "not empty incomings" (atom-incomings other) (list (atom-uid atom))))
+
                     (culturia-close culturia)
-  
+
+
                   ;; (test-equal "smoke" (list 1 2) (list 1 2))
                     )
                   ))
