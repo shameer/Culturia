@@ -176,8 +176,8 @@
                    ;; <arrow> cursor
                    (cursor-open session "table:arrows")
                    (cursor-open session "table:arrows" "append")
-                   (cursor-open session "index:arrows:outgoings(end)")
-                   (cursor-open session "index:arrows:incomings(start)"))))
+                   (cursor-open session "index:arrows:outgoings(uid,end)")
+                   (cursor-open session "index:arrows:incomings(uid,start)"))))
 
 
 (define-public (culturia-open path)
@@ -315,15 +315,17 @@
          
 
 (define (atom-arrow atom cursor)
-  (let* ((uid (atom-uid atom)))
+  (let ((uid (atom-uid atom)))
     (cursor-key-set cursor uid)
     (if (cursor-search cursor)
         (let loop ((atoms (list)))
           (if (eq? (car (cursor-key-ref cursor)) uid)
-              (let ((atoms (append (cursor-value-ref cursor) atoms)))
-                (if (cursor-next cursor)
-                    (loop atoms)
-                    atoms))
+              (match (cursor-value-ref cursor)
+                ((_ uid)
+                 (let ((atoms (cons uid atoms)))
+                   (if (cursor-next cursor)
+                       (loop atoms)
+                       atoms))))
               atoms))
         (list))))
 
@@ -334,3 +336,31 @@
 
 (define-public (atom-incomings atom)
   (atom-arrow atom (culturia-arrows-incomings (atom-culturia atom))))
+
+;;
+;; FIXME: test this and uncomment 
+;;
+;; (define-public (atom-delete atom)
+;;   (let* ((culturia (atom-culturia atom))
+;;          (atoms (culturia-atoms culturia))
+;;          (arrows (culturia-arrows culturia))
+;;          (outgoings (culturia-arrows-outgoings culturia))
+;;          (incomings (culturia-arrows-incomings culturia)))
+;;     ;; remove atom entry
+;;     (cursor-key-set atoms (atom-uid atom))
+;;     (cursor-remove atoms)
+;;     ;; remove outgoings arrows
+;;     (let ((remove
+;;            (lambda (cursor)
+;;              (cursor-key-set cursor)
+;;              (when (cursor-search cursor)
+;;                (let loop ()
+;;                  (if (eq? (car (cursor-key-ref cursor)) uid)
+;;                      (match (cursor-value-ref cursor)
+;;                        ((uid _)
+;;                         (cursor-key-set atoms uid)
+;;                         (cursor-search atoms)
+;;                         (cursor-remove atmos)
+;;                         (loop)))))))))
+;;       (remove outgoings)
+;;       (remove incomings))))
