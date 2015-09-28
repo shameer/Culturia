@@ -40,3 +40,16 @@ further.
 
 Anyway, all this need more time to mature. Another I need to tackle is the
 ability to run similar algorithm fully in memory and database backed.
+
+Done:
+
+- basic hypergraph cf. HACKING.md
+
+Goals:
+
+- traversi hypergraph traversal framework
+- load conceptnet
+- load wordnet
+- study PageRank like algorithms (SimRank, Personnalized SimRank)
+- study CoSimRank
+- LexRank & TextRank summarization
