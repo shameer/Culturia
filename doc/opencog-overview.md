@@ -1,11 +1,12 @@
-# OpenCog Sneak Peek
+**OpenCog Sneak Peek**
 
-[reference](http://wiki.opencog.org/wikihome/index.php/CogPrime_Overview)
+Main goal: simplify *local cognitive load*, the rule is to :
 
-*Large sentence in italic means more or less that I don't understand*
+- avoid opening doors
+- focus and what are the directions of the project.
 
-Main goal: simplify *local cognitive load*, the rule is to avoid opening doors
-and focus and what are the directions of the project.
+Move to an more algorithm, software centric overview while keeping the
+background theory.
 
 Notes taking algorithm:
 
@@ -29,11 +30,7 @@ Notes taking algorithm:
   - focus contextually relevant facts instead of trying to be comprehensive
   - strip examples [FIXME: add examples]
 
-*A few citations are missing in the original wiki. Look for comma character.*
-
-# New Table Of Content
-
-*Work in progress*
+**The goal is to move to this table of content**
 
 - Introduction
   - AI vs AGI
@@ -52,6 +49,68 @@ Notes taking algorithm:
 - Applications
 - Roadmap
 
+**The current (borked) table of content**
+
+<!-- markdown-toc start - Don't edit this section. Run M-x markdown-toc-generate-toc again -->
+**Table of Contents**
+
+- [Introduction](#introduction)
+    - [AI vs AGI](#ai-vs-agi)
+    - [{Open, Cog, Prime}](#open-cog-prime)
+    - [What Kind of Intelligence is OpenCog Aimed At?](#what-kind-of-intelligence-is-opencog-aimed-at)
+    - [What's the secret sauce](#whats-the-secret-sauce)
+    - [Key Claims](#key-claims)
+- [Theory](#theory)
+    - [Pattern based theory of the mind](#pattern-based-theory-of-the-mind)
+        - [What is a pattern?](#what-is-a-pattern)
+        - [What is intelligence?](#what-is-intelligence)
+        - [Which patterns?](#which-patterns)
+        - [How are organized those patterns?](#how-are-organized-those-patterns)
+    - [Mind-World Correspondence Principle](#mind-world-correspondence-principle)
+    - [High-Level Architecture of CogPrime](#high-level-architecture-of-cogprime)
+    - [Local, Global and Glocal](#local-global-and-glocal)
+- [OpenCog framework](#opencog-framework)
+    - [Natural Language Processing Pipeline](#natural-language-processing-pipeline)
+    - [Weigthed, Labeled Hypergraph: AtomSpace](#weigthed-labeled-hypergraph-atomspace)
+        - [Atoms: Types and Weights](#atoms-types-and-weights)
+            - [Atoms](#atoms)
+            - [Truth Values and Attention Values](#truth-values-and-attention-values)
+        - [Glocal Memory](#glocal-memory)
+        - [Memory Types and Associated Cognitive Processes in CogPrime](#memory-types-and-associated-cognitive-processes-in-cogprime)
+            - [Cognitive Synergy in Probabilistic Logic Network](#cognitive-synergy-in-probabilistic-logic-network)
+        - [Goal-Oriented Dynamics](#goal-oriented-dynamics)
+        - [Clarifying the Key Claims](#clarifying-the-key-claims)
+            - [Mutli-Memory Systems](#mutli-memory-systems)
+            - [Preception, Action and Environment](#preception-action-and-environment)
+            - [Developmental Pathways](#developmental-pathways)
+            - [Knowledge Representation](#knowledge-representation)
+            - [Cognitive Processes](#cognitive-processes)
+                - [Uncertain Logic for Declarative Knowledge](#uncertain-logic-for-declarative-knowledge)
+                - [Program Learning for Procedural Knowledge](#program-learning-for-procedural-knowledge)
+                - [Attention Allocation](#attention-allocation)
+                - [Internal Simulation and Episodic Knowledge](#internal-simulation-and-episodic-knowledge)
+                - [Low-Level Perception and Action](#low-level-perception-and-action)
+                - [Goals](#goals)
+                - [Fulfilling the Cognitive Equation](#fulfilling-the-cognitive-equation)
+                - [Occam's Razor](#occams-razor)
+                - [Cognitive Synergy](#cognitive-synergy)
+                    - [Synergies that Help Inference](#synergies-that-help-inference)
+                    - [Synergies that Help MOSES](#synergies-that-help-moses)
+                - [Synergies that Help Attention Allocation](#synergies-that-help-attention-allocation)
+                - [Further Synergies Related to Pattern Mining](#further-synergies-related-to-pattern-mining)
+                - [Synergies Related to Map Formation](#synergies-related-to-map-formation)
+            - [Emergent Structures and Dynamics](#emergent-structures-and-dynamics)
+- [Applications](#applications)
+    - [Virtual Agents](#virtual-agents)
+    - [Physical Robot](#physical-robot)
+    - [Build Me Something I Haven't Seen Before](#build-me-something-i-havent-seen-before)
+- [Roadmap](#roadmap)
+    - [Measuring Progress toward AGI](#measuring-progress-toward-agi)
+    - [Technical Roadmap](#technical-roadmap)
+- [Glossary](#glossary)
+- [Links](#links)
+
+<!-- markdown-toc end -->
 
 # Introduction
 
@@ -60,22 +119,13 @@ Notes taking algorithm:
 AI is really narrow-AI. AGI also know as *Human Level Intelligence* is a revival
 of original AI goals to create a human-like intelligence.
 
-## Theory
+## {Open, Cog, Prime}
 
-### What's the secret sauce
+- OpenCog is a framework
+- CogPrime is an AGI
+- OpenCogPrime is the implementation of CogPrime using OpenCog (proprietary)
 
-*Secret sauce*: Making diverse AI algorithms with diverse background theories
-work together in a *synergetic* and *cooperative* way.
-
-*white boxes* instead of *black boxes*.
-
-There is no particular new algorithm or architecture principle.
-
-- *synergy*: the interaction of elements that when combined produce a total
-  effect that is greater than the sum of the individual elements, contributions,
-  etc.
-
-### What Kind of Intelligence is OpenCog Aimed At?
+## What Kind of Intelligence is OpenCog Aimed At?
 
 Pratical goals:
 
@@ -91,18 +141,34 @@ Pratical goals:
 - *Artificial Scientist Test*: write and publish original science papers,
    based on ideas conceived by the AI due to its own reading of the literature 
 
-[FIXME: why this paragraph is here? It's key aspect of intelligence but...]
-
-Another important aspect of intelligence is *adaptiveness*: the capability of a
-system to adapt to its environment [recognize similar problems and apply
-previous structure and algorithm] effectively.
-
 [There is also an argument about “ressources” and “limited ressources”.
 I'll paraphrase  Alan Kay argument “To build the software of the future
 use the ressources of the future”
 [https://www.youtube.com/watch?v=gTAghAJcO1o](The Future doesn't have to be incremental)]
 
-### Key Claims
+## What's the secret sauce
+
+*Secret sauce*: Making diverse AI algorithms with diverse background theories
+work together in a *synergetic* and *cooperative* way.
+
+*white boxes* instead of *black boxes*.
+
+Another important aspect of intelligence is *adaptiveness*: the capability of a
+system to adapt to its environment [recognize similar problems and apply
+previous structure and algorithm] effectively.
+
+A key principle is: the use of multiple cognitive processes
+associated with multiple types of memory to enable an intelligent agent
+to execute the procedures that it believes have the best probability of
+working toward its goals in its current context.
+
+There is no particular new algorithm or architecture principle.
+
+- *synergy*: the interaction of elements that when combined produce a total
+  effect that is greater than the sum of the individual elements, contributions,
+  etc.
+
+## Key Claims
 
 This is a list of claims that the reader must accept to validate that OpenCog
 approach to AGI is a viable one.
@@ -117,6 +183,7 @@ An AGI system must:
   - sensory
   - intentional
   - attentional
+
 - Use *cognitive synergy* between different cognitive process to overcome
   processing bottlenecks. This means that cognitive processus must be able to
   understand and use the memory of each other.
@@ -179,109 +246,9 @@ Given the strengths and weaknesses of current and near-future digital computers:
 
 [Missing reference to [Relex](http://wiki.opencog.org/wikihome/index.php/RelEx_Dependency_Relationship_Extractor) and GrammarLink]
 
-## CogPrime and OpenCog
+# Theory
 
-- OpenCog is framework
-- CogPrime is an AGI
-- OpenCogPrime is the implementation of CogPrime using OpenCog (proprietary)
-
-### Applications
-
-- PLN + Relex: automated biological hypothesis generation based on information
-  gathered from PubMed abstracts
-- MOSES component for biological data analysis;
-- financial prediction, genetics, marketing data analysis and natural language
-  processing.
-
-Most relevant: OpenCog has also been used to control agents in virtual worlds
-
-#### Virtual Agents
-
-[OpenPetBrain](deadlink://) control virtual dog in a virtual world.
-
-Functionalities includes:
-
-- learning new behaviors based on imitation and reinforcement
-- responding to natural language commands and questions, with appropriate
-  actions and natural language replies
-- spontaneous exploration of their world, remembering their experiences and
-  using them to bias future learning and linguistic interaction
-
-Other tasks that could be implemented:
-
-- Learning to build steps or ladders to get desired objects that are high up
-- Learning to build a shelter to protect itself from aggressors
-- Learning to build structures resembling structures that it's shown
-  (even if the available materials are a bit different)
-- Learning how to build bridges to cross chasms
-
-the AI significance of learning tasks like this depends on:
-
-- what kind of feedback the system is given,
-- how complex its environment is
-
-The goal is to have the system learn to carry out tasks like this using general
-learning mechanisms and a general cognitive architecture, based on embodied
-experience and only scant feedback from human teachers.
-
-Tasks of the project *at time of writing* include:
-
-- Watch another character build steps to reach a high-up object
-- Figure out via imitation of this that, in a different context, building steps
-  to reach a high up object may be a good idea
-- Also figure out that, if it wants a certain high-up object but there are no
-  materials for building steps available, finding some other way to get elevated
-  will be a good idea that may help it get the object (including e.g. building a
-  ladder, or asking someone tall to pick it up, etc.) 
-- Figure out that, if the character wants to hide its valued object from a
-  creature much larger than it, it should build a container with a small hole
-  that the character can get through, but the creature cannot.
-
-#### Physical Robot
-
-Experiments were conducted using OpenCog and Nao Robot.
-
-Interposing DeSTIN as a perception->action “black box” between OpenCog and a
-robot can improve capability.
-
-A a “white box” approach can lead to better results. This means  realtime use
-of links between CogPrime nd DeSTIN internal networks.
-
-### Natural Language Processing
-
-[Nothing about atoms until this but cited]
-[This part is not at its place]
-
-The idea is to start with a *seed of rule-based NLP system* that will evolve
-can evolve using OpenCog learning systems. The NLP system is both rule and
-statistical based.
-
-The NLP pipeline is described by the following diagram:
-
-```
-[Link Parser] -> [ReLex] -> [Link2Atom] -> {AtomSpace}
-```
-
-A combination of rule-based and statistical NLP tools have been integrated with
-OpenCog, translating English into OpenCog atoms and vice versa:
-
-- [Link Parser](http://www.abisource.com/projects/link-grammar/): maps English
-  sentences into parse structures. Variants exists:
-
-  - SAT link parser (based on Boolean satisfaction solver)
-  - Viterbi link parser (try to closely simulate the human reading process)
-
-- [RelEx](http://wiki.opencog.org/wikihome/index.php/RelEx_Dependency_Relationship_Extractor):
-  translates Link Parser output into more abstract syntactico-semantic parses.
-  Also handles some other odds and ends like anaphor resolution.
-
-- [Link2Atom](http://wiki.opencog.org/wikihome/index.php/Link2Atom): translates
-  RelEx output to OpenCog atoms
-
-Also, NLGen2 has the task to build english sentend based on the results of the
-above pipeline.
-
-## Theory
+## Pattern based theory of the mind
 
 OpenCog way of thinking about intelligent systems is guided by the patternist
 [as in *pattern*] philosophy of the mind.
@@ -365,7 +332,7 @@ combining and relating symbolic patterns. Some AI approaches have focused heavil
 on these, more so than on **the identification of symbolic patterns in experience
 or the use of them to achieve practical goals**.
 
-#### How are organized those patterns?
+### How are organized those patterns?
 
 Following from the view of intelligence in terms of achieving complex goals in
 complex environments, comes a view in which the dynamics of a cognitive system
@@ -435,7 +402,7 @@ representation and algorithms.
 
 [Building Better Minds: An Architecture for Artificial General Intelligence. In preparation, 2013.](http://goertzel.org/monkeyburger/bbm_main.pdf) elaborate how these concepts arises concretely from CogPrime's structures and algorithms.
 
-### Mind-World Correspondence Principle
+## Mind-World Correspondence Principle
 
 An additional philosophical principle has guided CogPrime design; this is
 the "mind-world correspondence principle", which enlarges on the notion of
@@ -448,14 +415,9 @@ transition-sequences leading to relevant goals.
 
 ## High-Level Architecture of CogPrime
 
-A key principle is: the use of multiple cognitive processes
-associated with multiple types of memory to enable an intelligent agent
-to execute the procedures that it believes have the best probability of
-working toward its goals in its current context.
-
 [Figure depecting the different cognitive process with interactions](http://wiki.opencog.org/wikihome/index.php/File:1-no_gray.jpg).
 
-### Local, Global and Glocal
+## Local, Global and Glocal
 
 The two major supercategories of knowledge representation systems are *local* also called *explicit* and *global* also called *implicit* systems, with a hybrid category *glocal* that combines both local and global (explicit and implicit).
 
@@ -467,7 +429,52 @@ In the following we discuss:
 - distributed, neural-net-like knowledge representation, focusing on CogPrime’s
   *glocal* knowledge representation
 
-## Weigthed, Labeled Hypergraphs
+# OpenCog framework
+
+As described above OpenCog is an opionated framework which takes its root
+in the following principles:
+
+- Patternist theory of the mind
+- Expert cognitive processus
+- Synergy between processus
+
+## Natural Language Processing Pipeline
+
+[Nothing about atoms until this but cited]
+[This part is not at its place]
+
+The idea is to start with a *seed of rule-based NLP system* that will evolve
+can evolve using OpenCog learning systems. The NLP system is both rule and
+statistical based.
+
+The NLP pipeline is described by the following diagram:
+
+```
+[Link Parser] -> [ReLex] -> [Link2Atom] -> {AtomSpace}
+```
+
+A combination of rule-based and statistical NLP tools have been integrated with
+OpenCog, translating English into OpenCog atoms and vice versa:
+
+- [Link Parser](http://www.abisource.com/projects/link-grammar/): maps English
+  sentences into parse structures. Variants exists:
+
+  - SAT link parser (based on Boolean satisfaction solver)
+  - Viterbi link parser (try to closely simulate the human reading process)
+
+- [RelEx](http://wiki.opencog.org/wikihome/index.php/RelEx_Dependency_Relationship_Extractor):
+  translates Link Parser output into more abstract syntactico-semantic parses.
+  Also handles some other odds and ends like anaphor resolution.
+
+- [Link2Atom](http://wiki.opencog.org/wikihome/index.php/Link2Atom): translates
+  RelEx output to OpenCog atoms
+
+Also, NLGen2 has the task to build english sentend based on the results of the
+above pipeline.
+
+## AtomSpace
+
+Weigthed, Labeled Hypergraph.
 
 There are different knowledge representations in AI systems in an explicit, localized way, most of them descending from formal logic.
 
@@ -498,7 +505,7 @@ An hypergraph comes with the following dynamics:
 - add new atoms
 - remove existing ones 
 
-### Atoms: Types and Weights
+### Atoms Types and Weights
 
 It is important to note that the AtomSpace is neither a *neural net* nor a
 *semantic net*.
@@ -514,138 +521,18 @@ concepts.
 Most CogPrime Atoms have no corresponding English label. However, most CogPrime
 Atoms do have probabilistic truth values, allowing logical semantics. 
 
-#### Atom Types
-
-##### Basic 
-
-`ConceptNode`
-
-`ConceptNode` does not refer to a whole concept, but refer to part of a concept.
-It is a *basic semantic node* whose meaning comes from its links to other atoms.
-It would be more accurately named *concept or concept fragment or element node*.
-
-`NumberNode`
-
-`MemberLink`
-
-`SetLink`
-
-`ListLink`
-
-`InheritanceLink`
-
-`EvaluationLink`
-
-`PredicateNode`
-
-`ReferenceLink`
-
-`WordNode`
-
-`SubsetLinks`
-
-`ANDLink`, `ORLink`, `NOTLink`
-
-`AverageLink`
-
-`ContextLink`
-
-`ObjectNode`
-
-`VariableNode`
-
-##### Variable Atoms
-
-`VariableTypeLink`
-
-`VariableTypeNode`
-
-##### Logical Links
-
-InheritanceLink
-SubsetLink (aka ExtensionalInheritanceLink)
-Intensional InheritanceLink 
-SimilarityLink
-ExtensionalSimilarityLink
-IntensionalSimilarityLink 
-ImplicationLink
-ExtensionalImplicationLink
-IntensionalImplicationLink
-EquivalenceLink
-ExtensionalEquivalenceLink
-IntensionalEquivalenceLink
-
-##### Temporal Links
-
-PredictiveImplicationLink
-PredictiveAttractionLink
-SequentialANDLink
-SimultaneousANDLink 
-AfterLink
-AtTimeLink
-TimeNode
-
-##### Associative Links
-
-There are links representing associative, attentional relationships,
-
-- HebbianLink
-- AsymmetricHebbianLink
-- InverseHebbianLink
-- SymmetricInverseHebbianLink
-
-##### Procedure Nodes
-
-- SchemaNode, indicating any procedure
-- GroundedSchemaNode, indicating any procedure associated in the system with a Combo program or C++ function allowing the procedure to be executed
-- PredicateNode, indicating any predicate that associates a list of arguments with an output truth value
-- GroundedPredicateNode, indicating a predicate associated in the system with a Combo program or C++ function allowing the predicate’s truth value to be evaluated on a given specific list of arguments 
-
-ExecutionLinks and EvaluationLinks record the activity of SchemaNodes and PredicateNodes.
-
-ExecutionOutputLink
-
-##### Other Links
-
-There are also Atom types referring to specific types of data important to
-using OpenCog in specific contexts.
-
-there are Atom types referring to general natural language data types, such as
-
-    WordNode
-    SentenceNode
-    WordInstanceNode
-    DocumentNode 
-
- specific ones referring to relationships that are part of link-grammar parses of sentences
-
-    FeatureNode
-    FeatureLink
-    LinkGrammarRelationshipNode
-    LinkGrammarDisjunctNode
-
-or RelEx semantic interpretations of sentences
-
-    DefinedLinguisticConceptNode
-    DefinedLinguisticRelationshipNode
-    PrepositionalRelationshipNode
-
-There are also Atom types corresponding to entities important for embodying OpenCog in a virtual world, e.g.
-
-    ObjectNode
-    AvatarNode
-    HumanoidNode
-    UnknownObjectNode
-    AccessoryNode 
-
-#### Truth Values and Attention Values
-
 [XXX: This changed to Generic Truth Values]
 
 Atoms can be quantified with *truth values* that can have two components, one
 representing *probability* (strength) and the other representing
 *weight of evidence*. There is also *attention values* that have two components,
 *short-term* and *long-term importance*.
+
+#### Atoms 
+
+##### GetLink, PutLink and BindLink interaction
+
+https://groups.google.com/forum/?hl=fr#!topic/opencog/jXzPY7sJeUM
 
 
 ### Glocal Memory
@@ -972,15 +859,84 @@ One of the guiding ideas underlying the CogPrime design is that an AGI system wi
 
 The dependence of these posited emergences on the environment and goals of the AGI system should not be underestimated. For instance, PLN and pattern mining don’t have to lead to a hierarchical structured AtomSpace. But if the AGI system is placed in an environment which it hierarchically structured via its own efforts, thenPLN and pattern mining very likely will lead to a hierarchically structured AtomSpace. And if this environment consists of hierarchically structured language and culture, then what one has is a system of minds with hierarchical networks, each reinforcing the hierarchality of each others’ networks. Similarly, integrated cognition doesn’t have to lead to mirrorhouse structures, but integrated cognition about situations involving other minds studying and predicting and judging each other, is very likely to do so. What is needed for appropriate emergent structures to arise in a mind, is mainly that the knowledge representation is sufficiently flexible to allow these structures, and the cognitive processes are sufficiently intelligent to observe these structures in the environment and then mirror them internally. Of course, it also doesn’t hurt if the internal structures and processes are at least slightly biased toward the origination of the particular high-level emergent structures that are characteristic of the system’s environment/goals; and this is indeed the case with CogPrime ... biases toward hierarchical, heterarchical, dual and mirrorhouse networks are woven throughout the system design, in a thoroughgoing though not extremely systematic way.
 
-### Measuring Progress toward AGI
+# Applications
 
-[reference](http://wiki.opencog.org/wikihome/index.php/CogPrime_Overview#Measuring_Incremental_Progress_Toward_Human-Level_AGI)
+- PLN + Relex: automated biological hypothesis generation based on information
+  gathered from PubMed abstracts
+- MOSES component for biological data analysis;
+- financial prediction, genetics, marketing data analysis and natural language
+  processing.
 
-### Build Me Something I Haven't Seen Before
+Most relevant: OpenCog has also been used to control agents in virtual worlds
+
+## Virtual Agents
+
+[OpenPetBrain](deadlink://) control virtual dog in a virtual world.
+
+Functionalities includes:
+
+- learning new behaviors based on imitation and reinforcement
+- responding to natural language commands and questions, with appropriate
+  actions and natural language replies
+- spontaneous exploration of their world, remembering their experiences and
+  using them to bias future learning and linguistic interaction
+
+Other tasks that could be implemented:
+
+- Learning to build steps or ladders to get desired objects that are high up
+- Learning to build a shelter to protect itself from aggressors
+- Learning to build structures resembling structures that it's shown
+  (even if the available materials are a bit different)
+- Learning how to build bridges to cross chasms
+
+the AI significance of learning tasks like this depends on:
+
+- what kind of feedback the system is given,
+- how complex its environment is
+
+The goal is to have the system learn to carry out tasks like this using general
+learning mechanisms and a general cognitive architecture, based on embodied
+experience and only scant feedback from human teachers.
+
+Tasks of the project *at time of writing* include:
+
+- Watch another character build steps to reach a high-up object
+- Figure out via imitation of this that, in a different context, building steps
+  to reach a high up object may be a good idea
+- Also figure out that, if it wants a certain high-up object but there are no
+  materials for building steps available, finding some other way to get elevated
+  will be a good idea that may help it get the object (including e.g. building a
+  ladder, or asking someone tall to pick it up, etc.) 
+- Figure out that, if the character wants to hide its valued object from a
+  creature much larger than it, it should build a container with a small hole
+  that the character can get through, but the creature cannot.
+
+## Physical Robot
+
+Experiments were conducted using OpenCog and Nao Robot.
+
+Interposing DeSTIN as a perception->action “black box” between OpenCog and a
+robot can improve capability.
+
+A a “white box” approach can lead to better results. This means  realtime use
+of links between CogPrime nd DeSTIN internal networks.
+
+## Build Me Something I Haven't Seen Before
 
 ...
 
-## Glossary
+# Roadmap
+
+## Measuring Progress toward AGI
+
+[reference](http://wiki.opencog.org/wikihome/index.php/CogPrime_Overview#Measuring_Incremental_Progress_Toward_Human-Level_AGI)
+
+## Technical Roadmap
+
+http://wiki.opencog.org/wikihome/index.php/OpenCogPrime:Roadmap
+http://wiki.opencog.org/wikihome/index.php/Roadmap
+
+# Glossary
 
 - AtomSpace: is a neural-symbolic network designed to work nicely with PLN, MOSES, ECAN and the other key CogPrime cognitive processes;
 - Atom
@@ -1007,6 +963,8 @@ The dependence of these posited emergences on the environment and goals of the A
 - ReLex
 - 
 
-## Links
+# Links
 
+- [CogPrime Overview](http://wiki.opencog.org/wikihome/index.php/CogPrime_Overview)
 - [Bibliography of OpenCog](http://wiki.opencog.org/wikihome/index.php/Background_Publications)
+
