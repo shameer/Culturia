@@ -1,8 +1,8 @@
 # Culturia
 
-Culturia is clone of [OpenCog](http://opencog.org/)'s database [AtomSpace]()
-written in [Guile](https://www.gnu.org/software/guile/) and using
-[wiredtiger](http://wiredtiger.com/).
+Culturia is an [OpenCog](http://opencog.org/) offspring written in [Guile](https://www.gnu.org/software/guile/) and using [wiredtiger](http://wiredtiger.com/).
+
+Right now it's mainly a clone of [AtomSpace]() 
 
 This software is free software work licensed under the AfferoGPLv3.
 
@@ -47,9 +47,13 @@ Done:
 
 Goals:
 
-- traversi hypergraph traversal framework
-- load conceptnet
-- load wordnet
-- study PageRank like algorithms (SimRank, Personnalized SimRank)
-- study CoSimRank
+- Implement `traversi` hypergraph traversal framework
+- Implement z-order index
+- Implement fuzzy search of names
+- Load conceptnet
+- Load wordnet
+- Study PageRank like algorithms (SimRank, Personnalized SimRank)
+- Study CoSimRank
 - LexRank & TextRank summarization
+- Study GrammarLink and ReLex
+- Implement a similar feature as wordvec: `king - man = queen`
