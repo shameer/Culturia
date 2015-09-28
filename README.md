@@ -49,7 +49,9 @@ Goals:
 
 - Implement `traversi` hypergraph traversal framework
 - Implement z-order index
+- Implement timeseries
 - Implement fuzzy search of names
+- Implement explorer GUI
 - Load conceptnet
 - Load wordnet
 - Study PageRank like algorithms (SimRank, Personnalized SimRank)
