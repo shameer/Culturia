@@ -8,53 +8,35 @@ This software is free software work licensed under the AfferoGPLv3.
 
 The name is a reference to [Culture and Empire by Pieter Hintjens](http://cultureandempire.com).
 
-## Reference API
+## 2015/09/22 - What Are The Civilian Applications?
 
-### `<culturia>`
+I started the the implementation and pushed some code. This includes FFI
+bindings of wiredtiger with documentation and a few examples (that may not work
+as-is). The best way to get started with wiredtiger is to read
+[Schema, Columns, Column Groups, Indices and Projections](http://source.wiredtiger.com/2.6.1/schema.html).
 
-#### `(culturia-create path)`
+## 2015/09/27 - Well I Was In The Neighbourhood
 
-Create a `<culturia>` at `PATH`.
+I tried several designs that includes:
 
-#### `(culturia-open path)`
+- **version control system**: this works using copy-on-write and filtering stored atoms by *revision path*. Things that must be taken into account:
+  - moving from one "workspace" to another. This requires to remove all changes that have been done in the "workspace". Other bookeeping scheme like transaction/multiple state revision so that it's possible for several thread to work on different *workspace*. 
+  - and more interestingly provide an API that allows to browser the history of a single node and continue graph exploration from there.
+  
+- **hierarchical hypergraph**: Simple hypergraph inheritance can use a similar model
+  to version control system. You build a tree (or forest) using a set of tuples
+  then that you cache in memory. Then when fetching atoms, you check that those
+  atoms are part of the correct *tree branch path*
+  
+- *multiple parents hypergraph*: extending the above allowing parent atoms to
+  have multiple parents. Not sure what the use of this
 
-Open `<culturia>` found at `PATH`.
+I end up thinking really about recursive hypergraph where atoms could freely
+link to other atoms but be part of a more general structure. Then comes the idea
+of *recursive fuzzy hypergraph* which really is the thing. It allows to model
+how for instance a “word” has 90% of time the sens of “an atomic semantic token of sentence” and 10% of time the sens of “a message”. Given that it ca
+be implemented using a simple hypergraph efficently there is not need to go
+further.
 
-#### `(culturia-close culturia)`
-
-Close `<culturia>`.
-
-#### `(culturia-begin culturia)`
-
-#### `(culturia-commit culturia)`
-
-#### `(culturia-rollback culturia)`
-
-#### `(with-transaction culturia e ...)`
-
-### `<atom>`
-
-#### `(culturia-atom-create culturia type name)`
-
-#### `(culturia-atom-ref/uid culturia uid)`
-
-#### `(culturia-atom-ref culturia type #:optional name)`
-
-#### `(atom-uid atom)`
-
-#### `(atom-type atom)`
-
-#### `(atom-name atom)`
-
-#### `(atom-assoc atom)`
-
-#### `(atom-assoc-set atom key value)`
-
-#### `(atom-assoc-ref atom key)`
-
-#### `(atom-link atom other)`
-
-#### `(atom-outgoings atom)`
-
-#### `(atom-incomings atom)`
-
+Anyway, all this need more time to mature. Another I need to tackle is the
+ability to run similar algorithm fully in memory and database backed.
