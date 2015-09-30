@@ -60,7 +60,7 @@ cf. [Is it possible to achieve something similar to word2vec](http://stackoverfl
 
 I started working on the traversi framework.
 
-I've also been thinking about hyper[graph]{viz}(or).
+I've also been thinking about hyper[graph]{viz}(or). #mezangelle
 
 Done:
 
