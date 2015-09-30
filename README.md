@@ -38,12 +38,33 @@ how for instance a “word” has 90% of time the sens of “an atomic semantic 
 be implemented using a simple hypergraph efficently there is not need to go
 further.
 
-Anyway, all this need more time to mature. Another I need to tackle is the
+Anyway, all this need more time to mature. Another thing I need to tackle is the
 ability to run similar algorithm fully in memory and database backed.
+
+## 2015/09/30 - Just Another Victim Of The Ambient Morality
+
+I continued my quest for algorithms that could provide the required operations
+to traverse the graph in original ways. Gremlin people seem to stay deaf to my
+questions. Inference engines are original graph algorithm compared to
+breath/depth first search and I can't really put a name on it. Page Rank like
+algorithm (LexRank, TextRank) are nice but they lake of realtime pragmatism.
+How does an one restart Page Rank over a graph that is already ranked. That
+said, there seem to be research on the topic maybe Personnalized Page Rank.
+Also the CPU intensive, learning nature of Page Rank can be minimized by
+running PR over a sub-graph or using CoSimRank. It seems also that the
+topology is opens the door to simple ways to compute neighborhood even if
+it requires prior learning 
+cf. [Is it possible to achieve something similar to word2vec](http://stackoverflow.com/questions/32851830/is-it-possible-to-achieve-something-similar-to-word2vec-using-a-graphdb). I must remember to read about word2vec.
+
+[Marko Rodriguez article on datastax dev blog, Tales from the TinkerPop, is full of graph-theory revelant links](http://www.datastax.com/dev/blog/tales-from-the-tinkerpop).
+
+I started working on the traversi framework.
+
+I've also been thinking about hyper[graph]{viz}(or).
 
 Done:
 
-- basic hypergraph cf. HACKING.md
+- basic hypergraph cf. HACKING.md 
 
 Goals:
 
