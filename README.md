@@ -68,7 +68,8 @@ Done:
 
 Goals:
 
-- Implement `traversi` hypergraph traversal framework
+- Put automous code into a single file
+- Implement `gremlin` hypergraph traversal framework
 - Implement z-order index
 - Implement timeseries
 - Implement fuzzy search of names
