@@ -2,11 +2,14 @@
 
 (use-modules (culturia wiredtiger))
 
+(use-modules (rnrs hashtables))
+
 (use-modules (srfi srfi-1))
 (use-modules (srfi srfi-9))  ;; records
 (use-modules (srfi srfi-9 gnu))  ;; set-record-type-printer!
-(use-modules (srfi srfi-19)) ;; date
-(use-modules (srfi srfi-26)) ;; cut
+(use-modules (srfi srfi-19))  ;; date
+(use-modules (srfi srfi-26))  ;; cut
+(use-modules (srfi srfi-41))  ;; stream
 
 (use-modules (ice-9 match))
 (use-modules (ice-9 format))
@@ -26,6 +29,7 @@
   "shorthand to throw EXCEPTION with MESSAGE formated with REST"
   (throw *exception* (apply format (append (list #false message) rest))))
 
+;; well, i'm too lazy to create other error messages
 (define (Oops!)
   (raise "Oops!"))
 
@@ -135,25 +139,13 @@
 
 (define (culturia-init connection)
   (let ((session (session-open connection)))
-    ;; create a main table to store atom informations
+    ;; create a main table to store <atom>
     (session-create session
                     "table:atoms"
                     (string-append "key_format=r,"
                                    "value_format=SSS,"
                                    "columns="
-                                   (string-append "("
-                                                  "uid,"
-                                                  "type,"
-                                                  "name,"
-                                                  "assoc,"
-                                                  ")")))
-
-    ;; create related indices
-
-    ;; this index is useful to retrieve atom of given type name
-    (session-create session "index:atoms:types" "columns=(type)")
-    ;; this index is useful to retrieve an <atom> of given type and name
-    (session-create session "index:atoms:type-names" "columns=(type,name)")
+                                   "(uid,assoc)"))
 
     ;; create a main table to store <arrow>
     (session-create session
@@ -171,8 +163,6 @@
                    ;; <atom> cursors
                    (cursor-open session "table:atoms")
                    (cursor-open session "table:atoms" "append")
-                   (cursor-open session "index:atoms:types(uid)")
-                   (cursor-open session "index:atoms:type-names(uid)")
                    ;; <arrow> cursor
                    (cursor-open session "table:arrows")
                    (cursor-open session "table:arrows" "append")
@@ -232,87 +222,61 @@
 ;;; <atoms>
 
 
-(define-record-type <atom>
-  (make-atom culturia uid type name assoc)
-  atom?
-  (culturia atom-culturia)
-  (uid atom-uid)
-  (type atom-type)
-  (name atom-name)
-  (assoc atom-assoc %atom-assoc-set!))
+(define-record-type* <atom> culturia uid assoc)
+
+(export atom-uid atom-assoc)
+
+(define-public (atom-save atom)
+  (if (null? (atom-uid))
+      ;; insert
+      (let ((cursor (culturia-atoms-append (atom-culturia atom))))
+        (cursor-value-set cursor (scm->string (atom-assoc atom)))
+        (cursor-insert cursor)
+        ;; return a new version of the <atom>
+        (make-atom culturia (car (cursor-key-ref cursor)) assoc))
+      ;; update
+      (let ((cursor (culturia-atoms (atom-culturia atom))))
+          (cursor-key-set cursor (atom-uid uid))
+          (when (not (cursor-search cursor))
+            (Oops!))
+          (cursor-value-set cursor (scm->string (atom-assoc atom)))
+          (cursor-update cursor)
+          atom)))
 
 
-(export atom-uid atom-type atom-name atom-assoc)
+(define-public (culturia-ref culturia)
+  (lambda (uid)
+    (let ((cursor (culturia-atoms culturia)))
+      (cursor-key-set cursor uid)
+      (when (not (cursor-search cursor))
+        (Oops!))
+      (let ((assoc (string->scm (cursor-value-ref cursor))))
+        (make-atom culturia uid assoc)))))
 
 
-(define-public (culturia-atom-create culturia type name)
-  (let ((cursor (culturia-atoms-append culturia)))
-    (cursor-value-set cursor type name (scm->string (list)))
-    (cursor-insert cursor)
-    (make-atom culturia (car (cursor-key-ref cursor)) type name (list))))
-
-
-(define-public (culturia-atom-ref/uid culturia uid)
-  (let ((cursor (culturia-atoms culturia)))
-    (cursor-key-set cursor uid)
-    (when (not (cursor-search cursor))
-      (Oops!))
-    (match (cursor-value-ref cursor)
-      [(type name assoc) (make-atom culturia uid type name (string->scm assoc))])))
-
-
-(define (culturia-atom-ref/type+name culturia type name)
-  (let ((cursor (culturia-atoms-type-names culturia))
-        (match? (lambda (other)
-                  (equal? other (list type name)))))
-    (cursor-key-set cursor type name)
-    (if (cursor-search cursor)
-        (culturia-atom-ref/uid culturia (car (cursor-value-ref cursor)))
-        #nil)))
-
-
-(define-public (culturia-atom-ref/type culturia type)
-  (let ((cursor (culturia-atoms-types culturia)))
-    (cursor-key-set cursor type)
-    (if (cursor-search cursor)
-        (let loop ((atoms (list)))
-          (if (equal? (cursor-key-ref cursor) (list type))
-              (let ((atoms (append (cursor-value-ref cursor) atoms)))
-                (if (cursor-next cursor)
-                    (loop atoms)
-                    atoms))
-              atoms))
-        (list))))
-
-
-(define*-public (culturia-atom-ref culturia type #:optional name)
-  (if name
-      (culturia-atom-ref/type+name culturia type name)
-      (culturia-atom-ref/type culturia type)))
-
-
-(define-public (atom-assoc-set! atom key value)
+(define-public (atom-set atom key value)
   (let* ((assoc (atom-assoc atom))
          (assoc (alist-delete key assoc))
-         (assoc (acons key value assoc))
-         (cursor (culturia-atoms (atom-culturia atom))))
-    (cursor-key-set cursor (atom-uid atom))
-    (when (not (cursor-search cursor))
-      (Oops!))
-    (cursor-value-set cursor (atom-type atom) (atom-name atom) (scm->string assoc))
-    (cursor-update cursor)
-    (%atom-assoc-set! atom assoc)))
+         (assoc (acons key value assoc)))
+    (make-atom (atom-culturia atom) (atom-uid atom) assoc)))
 
 
-(define-public (atom-assoc-ref atom key)
-  (assoc-ref (atom-assoc atom) key))
+(define-public (atom-ref key)
+  (lambda (atom)
+    (assoc-ref (atom-assoc atom) key)))
 
 
-(define-public (atom-link atom other)
+(define-public (atom-link! atom other)
   (let ((cursor (culturia-arrows-append (atom-culturia atom))))
     (cursor-value-set cursor (atom-uid atom) (atom-uid other))
     (cursor-insert cursor)))
-         
+
+
+(define-public (atom-unlink atom other)
+  (Oops!))
+
+
+;; define traversi seed procedures for outgoings and incomings arrows
 
 (define (atom-arrow atom cursor)
   (let ((uid (atom-uid atom)))
@@ -331,36 +295,60 @@
 
 
 (define-public (atom-outgoings atom)
-  (atom-arrow atom (culturia-arrows-outgoings (atom-culturia atom))))
+  "Return a stream of <gremlin> of the outgoings arrows of ATOM"
+  (let* ((cursor (culturia-arrows-outgoings (atom-culturia atom)))
+         (uids (atom-arrow atom cursor))
+         (ref (culturia-ref (atom-culturia atom))))
+    (map ref uids)))
 
 
 (define-public (atom-incomings atom)
-  (atom-arrow atom (culturia-arrows-incomings (atom-culturia atom))))
+  "Return a stream of <gremlin> of the incomings arrows of ATOM"
+  (let* ((cursor (culturia-arrows-incomings (atom-culturia atom)))
+         (uids (atom-arrow atom cursor))
+         (ref (culturia-ref (atom-culturia atom))))
+    (map ref uids)))
 
+
+;; define atom delete
+
+(define (remove-arrows cursor)
+  (cursor-key-set cursor)
+  (when (cursor-search cursor)
+    (let loop ()
+      (if (eq? (car (cursor-key-ref cursor)) uid)
+          (match (cursor-value-ref cursor)
+            ((uid _)
+             (cursor-key-set atoms uid)
+             (cursor-search atoms)
+             (cursor-remove atmos)
+             (loop)))))))
+
+
+(define-public (atom-delete atom)
+  (let* ((culturia (atom-culturia atom))
+         (atoms (culturia-atoms culturia))
+         (arrows (culturia-arrows culturia))
+         (outgoings (culturia-arrows-outgoings culturia))
+         (incomings (culturia-arrows-incomings culturia)))
+    ;; remove atom entry
+    (cursor-key-set atoms (atom-uid atom))
+    (cursor-remove atoms)
+    ;; remove outgoings arrows
+    (remove-arrows outgoings)
+    (remove-arrows incomings)))
+
+
+;; ---
+
+;;; traverse framework
+
+;; very much inspired from gremlin
+;; http://tinkerpop.incubator.apache.org/docs/3.0.0-incubating/
 ;;
-;; FIXME: test this and uncomment 
+;; traverser procedures that takes a stream of <gremlin> as input
+;; and return another stream of <gremlin> possibly of different type.
+;; Most of the time those <gremlin> value is atoms uid ie. integers.
 ;;
-;; (define-public (atom-delete atom)
-;;   (let* ((culturia (atom-culturia atom))
-;;          (atoms (culturia-atoms culturia))
-;;          (arrows (culturia-arrows culturia))
-;;          (outgoings (culturia-arrows-outgoings culturia))
-;;          (incomings (culturia-arrows-incomings culturia)))
-;;     ;; remove atom entry
-;;     (cursor-key-set atoms (atom-uid atom))
-;;     (cursor-remove atoms)
-;;     ;; remove outgoings arrows
-;;     (let ((remove
-;;            (lambda (cursor)
-;;              (cursor-key-set cursor)
-;;              (when (cursor-search cursor)
-;;                (let loop ()
-;;                  (if (eq? (car (cursor-key-ref cursor)) uid)
-;;                      (match (cursor-value-ref cursor)
-;;                        ((uid _)
-;;                         (cursor-key-set atoms uid)
-;;                         (cursor-search atoms)
-;;                         (cursor-remove atmos)
-;;                         (loop)))))))))
-;;       (remove outgoings)
-;;       (remove incomings))))
+;; traverser procedures are prefixed with ":" character
+
