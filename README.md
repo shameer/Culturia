@@ -8,14 +8,35 @@ This software is free software work licensed under the AfferoGPLv3.
 
 The name is a reference to [Culture and Empire by Pieter Hintjens](http://cultureandempire.com).
 
-## 2015/09/22 - What Are The Civilian Applications?
+## Roadmap
+
+Done:
+
+- basic hypergraph cf. HACKING.md 
+
+Goals:
+
+- Put automous code into a single file
+- `gremlin` is actually srfi 41 with a probably some specific stream proc
+- Implement user defined indices with z-index, trigrams, fulltext
+- Implement explorer GUI
+- Load conceptnet, wordnet, wikidata
+- Study PageRank like algorithms (SimRank, Personnalized SimRank)
+- Study CoSimRank
+- LexRank & TextRank summarization
+- Study GrammarLink and ReLex
+- Implement a similar feature as wordvec: `king - man = queen`
+
+## Blog
+
+### 2015/09/22 - What Are The Civilian Applications?
 
 I started the the implementation and pushed some code. This includes FFI
 bindings of wiredtiger with documentation and a few examples (that may not work
 as-is). The best way to get started with wiredtiger is to read
 [Schema, Columns, Column Groups, Indices and Projections](http://source.wiredtiger.com/2.6.1/schema.html).
 
-## 2015/09/27 - Well I Was In The Neighbourhood
+### 2015/09/27 - Well I Was In The Neighbourhood
 
 I tried several designs that includes:
 
@@ -41,7 +62,7 @@ further.
 Anyway, all this need more time to mature. Another thing I need to tackle is the
 ability to run similar algorithm fully in memory and database backed.
 
-## 2015/09/30 - Just Another Victim Of The Ambient Morality
+### 2015/09/30 - Just Another Victim Of The Ambient Morality
 
 I continued my quest for algorithms that could provide the required operations
 to traverse the graph in original ways. Gremlin people seem to stay deaf to my
@@ -62,19 +83,27 @@ I started working on the traversi framework.
 
 I've also been thinking about hyper[graph]{viz}(or). #mezangelle
 
-Done:
+### 2015/10/05 - A Series Of Unlikely Explanations
 
-- basic hypergraph cf. HACKING.md 
+In the previous paragraph, I did not talk about my research on the tasks of NLP
+outside the word2vec things. There is different steps and level of
+"understanding" of a sentence in NLP: lexical, syntaxic, semantic. The research
+done as part of [Combinatorial Categorical Grammar](https://en.wikipedia.org/wiki/Combinatory_categorial_grammar)
+are interesting. Even if some how it different from dependency grammar
+it seems to me that having logical reprensentation of a sentence is the goal
+of both methods. As the [tutorial explains](http://yoavartzi.com/tutorial/)
+in CCG the method to infer this logic relations is via unsupervised learning.
+This is really painful because a) I don't know that technics b) I don't like it
+c) most importantly it requires an annotated corpus.
 
-Goals:
+Nilas raised an important drawback of the approach I've taken with the database
+where there is basicaly no transient atom states and that everything is
+propagated synchronously to the hard disk. This can slow down significantly
+computation. I have real use case example yet.
 
-- Put automous code into a single file
-- `gremlin` is actually srfi 41 with a probably some specific stream proc
-- Implement user defined indices with z-index, trigrams, fulltext
-- Implement explorer GUI
-- Load conceptnet, wordnet, wikidata
-- Study PageRank like algorithms (SimRank, Personnalized SimRank)
-- Study CoSimRank
-- LexRank & TextRank summarization
-- Study GrammarLink and ReLex
-- Implement a similar feature as wordvec: `king - man = queen`
+I had a quick look at [minikanren](http://minikanren.org) it looks like the
+best candidate to implement my algorithms as soon as know which algorithm I
+want to implement (!) which is still an open question. minikanren has
+probabilistic version and a lot of documentation. The implementation is
+straithforward. But I'm not there yet.
+
