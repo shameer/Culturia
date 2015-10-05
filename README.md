@@ -1,12 +1,14 @@
 # Culturia
 
-Culturia is an [OpenCog](http://opencog.org/) offspring written in [Guile](https://www.gnu.org/software/guile/) and using [wiredtiger](http://wiredtiger.com/).
-
-Right now it's mainly a clone of [AtomSpace]() 
+Culturia is an [cyc](http://www.cyc.com/) clone and [OpenCog](http://opencog.org/) offspring
+written in [Guile](https://www.gnu.org/software/guile/) powered
+by [wiredtiger](http://wiredtiger.com/).
 
 This software is free software work licensed under the AfferoGPLv3.
 
-The name is a reference to [Culture and Empire by Pieter Hintjens](http://cultureandempire.com).
+The name is a reference to
+[Culture and Empire by Pieter Hintjens](http://cultureandempire.com) and
+[Intelligence Augmentation](https://en.wikipedia.org/wiki/Intelligence_amplification).
 
 ## Roadmap
 
@@ -16,9 +18,9 @@ Done:
 
 Goals:
 
-- Put automous code into a single file
-- `gremlin` is actually srfi 41 with a probably some specific stream proc
 - Implement user defined indices with z-index, trigrams, fulltext
+- Implement a blackboard system
+- `gremlin` is actually srfi 41 with a probably some specific stream proc
 - Implement explorer GUI
 - Load conceptnet, wordnet, wikidata
 - Study PageRank like algorithms (SimRank, Personnalized SimRank)
