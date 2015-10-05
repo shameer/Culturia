@@ -23,794 +23,480 @@
 
 
 ;; minikanren
+;                    Quick miniKanren-like code 
+;
+; written at the meeting of a Functional Programming Group
+; (Toukyou/Shibuya, Apr 29, 2006), as a quick illustration of logic
+; programming.  The code is really quite trivial and unsophisticated:
+; it was written without any preparation whatsoever. The present file
+; adds comments and makes minor adjustments.
+;
+; $Id: sokuza-kanren.scm,v 1.1 2006/05/10 23:12:41 oleg Exp oleg $
 
-(define c->S (lambda (c) (car c)))
 
-(define c->D (lambda (c) (cadr c)))
+; Point 1: `functions' that can have more (or less) than one result
+;
+; As known from logic, a binary relation xRy (where x \in X, y \in Y)
+; can be represented by a _function_  X -> PowerSet{Y}. As usual in
+; computer science, we interpret the set PowerSet{Y} as a multi-set
+; (realized as a regular scheme list). Compare with SQL, which likewise
+; uses multisets and sequences were sets are properly called for. 
+; Also compare with Wadler's `representing failure as a list of successes.'
+;
+; Thus, we represent a 'relation' (aka `non-deterministic function')
+; as a regular scheme function that returns a list of possible results.
+; Here, we use a regular list rather than a lazy list, just to be quick.
 
-(define c->A (lambda (c) (caddr c)))
+; First, we define two primitive non-deterministic functions;
+; one of them yields no result whatsoever for any argument; the other
+; merely returns its argument as the sole result.
 
-(define c->T (lambda (c) (cadddr c)))
+(define (fail x) '())
+(define (succeed x) (list x))
 
-(define empty-c '(() () () ()))
+; We build more complex non-deterministic functions by combining
+; the existing ones with the help of the following two combinators.
 
-(define-syntax lambdag@
-  (syntax-rules (:)
-    ((_ (c) e) (lambda (c) e))
-    ((_ (c : S D A T) e)
-     (lambda (c)
-       (let ((S (c->S c))
-             (D (c->D c))
-             (A (c->A c))
-             (T (c->T c)))
-         e)))))
 
-(define mzero (lambda () #f))
-
-(define unit (lambdag@ (c) c))
-
-(define choice (lambda (c f) (cons c f)))
-
-(define-syntax lambdaf@ 
-  (syntax-rules () ((_ () e) (lambda () e))))
-
-(define-syntax inc 
-  (syntax-rules () ((_ e) (lambdaf@ () e))))
-
-(define empty-f (lambdaf@ () (mzero)))
-
-(define-syntax case-inf
-  (syntax-rules ()
-    ((_ e (() e0) ((f^) e1) ((c^) e2) ((c f) e3))
-     (let ((c-inf e))
-       (cond
-         ((not c-inf) e0)
-         ((procedure? c-inf)  (let ((f^ c-inf)) e1))
-         ((not (and (pair? c-inf)
-                 (procedure? (cdr c-inf))))
-          (let ((c^ c-inf)) e2))
-         (else (let ((c (car c-inf)) (f (cdr c-inf))) 
-                 e3)))))))
-
-(define-syntax run
-  (syntax-rules ()
-    ((_ n (x) g0 g ...)
-     (take n
-       (lambdaf@ ()
-         ((fresh (x) g0 g ...
-            (lambdag@ (final-c)
-              (let ((z ((reify x) final-c)))
-                (choice z empty-f))))
-          empty-c))))))
-
-(define-syntax run*
-  (syntax-rules ()
-    ((_ (x) g ...) (run #f (x) g ...))))
-
-(define take
-  (lambda (n f)
-    (cond
-      ((and n (zero? n)) '())
-      (else
-       (case-inf (f) 
-         (() '())
-         ((f) (take n f))
-         ((c) (cons c '()))
-         ((c f) (cons c (take (and n (- n 1)) f))))))))
-
-(define-syntax fresh
-  (syntax-rules ()
-    ((_ (x ...) g0 g ...)
-     (lambdag@ (c)
-       (inc (let ((x (var 'x)) ...)
-              (bind* (g0 c) g ...)))))))
-
-(define-syntax bind*
-  (syntax-rules ()
-    ((_ e) e)
-    ((_ e g0 g ...) (bind* (bind e g0) g ...))))
-
-(define bind
-  (lambda (c-inf g)
-    (case-inf c-inf
-      (() (mzero))
-      ((f) (inc (bind (f) g)))
-      ((c) (g c))
-      ((c f) (mplus (g c) (lambdaf@ () (bind (f) g)))))))
-
-(define mplus
-  (lambda (c-inf f)
-    (case-inf c-inf
-      (() (f))
-      ((f^) (inc (mplus (f) f^)))
-      ((c) (choice c f))
-      ((c f^) (choice c (lambdaf@ () (mplus (f) f^)))))))
-
-(define-syntax conde
-  (syntax-rules ()
-    ((_ (g0 g ...) (g1 g^ ...) ...)
-     (lambdag@ (c) (inc (mplus* (bind* (g0 c) g ...)
-                                (bind* (g1 c) g^ ...) ...))))))
-
-(define-syntax mplus*
-  (syntax-rules ()
-    ((_ e) e)
-    ((_ e0 e ...) (mplus e0 (lambdaf@ () (mplus* e ...))))))
-
-(define-syntax case-value
-  (syntax-rules ()
-    ((_ u ((t1) e0) ((at dt) e1) ((t2) e2))
-     (let ((t u))
-       (cond
-	 ((var? t) (let ((t1 t)) e0))
-	 ((pair? t) (let ((at (car t)) (dt (cdr t))) e1))
-	 (else (let ((t2 t)) e2)))))))
-
-(define make-tag-A
-  (lambda (tag pred)
-    (lambda (u)
-      (lambdag@ (c : S D A T)
-        (case-value (walk u S)
-          ((x) (cond
-                 ((make-tag-A+ x tag pred c S D A T) =>
-                  unit)
-                 (else (mzero))))
-          ((au du) (mzero))
-          ((u) (cond
-                 ((pred u) (unit c))
-                 (else (mzero)))))))))
-
-(define make-tag-A+
-  (lambda (u tag pred c S D A T)
-    (cond
-      ((ext-A (walk u S) tag pred S A) => 
-       (lambda (A+)  
-         (cond
-           ((null? A+) c)
-           (else (let ((D (subsume A+ D))
-                       (A (append A+ A)))
-                   (subsume-A S D A T))))))
-      (else #f))))
-
-(define subsume-A
-  (lambda (S D A T)
-    (let ((x* (rem-dups (map lhs A))))
-      (subsume-A+ x* S D A T))))
-
-(define subsume-A+
-  (lambda (x* S D A T)
-    (cond
-      ((null? x*) `(,S ,D ,A ,T))
-      (else (let ((x (car x*)))
-              (let ((D/T (update-D/T x S D A T)))
-                (let ((D (car D/T)) (T (cdr D/T)))
-                  `(,S ,D ,A ,T))))))))
-
-(define ext-A 
-  (lambda (x tag pred S A)
-    (cond
-      ((null? A) `((,x . (,tag . ,pred))))
-      (else
-       (let ((a (car A)) (A (cdr A)))
-         (let ((a-tag (pr->tag a)))
-           (cond
-             ((eq? (walk (lhs a) S) x)
-              (cond
-                ((tag=? a-tag tag) '())
-                (else #f)))
-             (else (ext-A x tag pred S A)))))))))
-
-(define symbolo (make-tag-A 'sym symbol?))
-
-(define numbero (make-tag-A 'num number?))
-
-(define booleano
+; (disj f1 f2) returns all the results of f1 and all the results of f2.
+; (disj f1 f2) returns no results only if neither f1 nor f2 returned
+; any. In that sense, it is analogous to the logical disjunction.
+(define (disj f1 f2)  
   (lambda (x)
-    (conde
-      ((== #f x))
-      ((== #t x)))))
+    (append (f1 x) (f2 x))))
 
-(define pr->tag (lambda (pr) (car (rhs pr))))
-
-(define pr->pred (lambda (pr) (cdr (rhs pr))))
-
-(define =/= 
-  (lambda (u v)
-    (lambdag@ (c : S D A T)
-      (cond
-        ((unify u v S) => (post-unify-=/= S D A T))
-        (else (unit c))))))
-
-(define post-unify-=/=
-  (lambda (S D A T)
-    (lambda (S+)
-      (cond
-        ((eq? S+ S) (mzero))
-        (else (let ((D+ (list (prefix-S S+ S))))
-                (let ((D+ (subsume A D+)))
-                  (let ((D+ (subsume T D+)))
-                    (let ((D (append D+ D)))
-                      (unit `(,S ,D ,A ,T)))))))))))
-
-(define prefix-S
-  (lambda (S+ S)
-    (cond
-      ((eq? S+ S) '())
-      (else (cons (car S+) (prefix-S (cdr S+) S))))))
-
-(define subsume
-  (lambda (A/T D)
-    (remp (lambda (d) (exists (subsumed-pr? A/T) d))
-      D)))
-
-(define subsumed-pr?
-  (lambda (A/T)
-    (lambda (pr-d)
-      (let ((u (rhs pr-d)))
-        (cond
-          ((var? u) #f)
-          (else
-           (let ((pr (assq (lhs pr-d) A/T)))
-             (and pr
-               (let ((tag (pr->tag pr)))
-                 (cond
-                   ((and (tag? tag)
-                         (tag? u)
-                         (tag=? u tag)))
-                   (((pr->pred pr) u) #f)
-                   (else #t)))))))))))
-
-(define == 
-  (lambda (u v)
-    (lambdag@ (c : S D A T)
-      (cond
-        ((unify u v S) =>
-         (post-unify-== c S D A T))
-        (else (mzero))))))
-
-(define post-unify-==
-  (lambda (c S D A T)
-    (lambda (S+)
-      (cond
-        ((eq? S+ S) (unit c))
-        ((verify-D D S+) =>
-         (lambda (D)
-           (cond
-             ((post-verify-D S+ D A T) => unit)
-             (else (mzero)))))
-        (else (mzero))))))
-
-(define verify-D
-  (lambda (D S)
-    (cond
-      ((null? D) '())
-      ((verify-D (cdr D) S) =>
-       (lambda (D+)
-         (verify-D+ (car D) D+ S)))
-      (else #f))))
-
-(define verify-D+ 
-  (lambda (d D S)
-    (cond
-      ((unify* d S) =>
-       (lambda (S+)
-         (cond
-           ((eq? S+ S) #f)
-           (else (cons (prefix-S S+ S) D)))))
-      (else D))))
-
-(define post-verify-D
-  (lambda (S D A T)
-    (cond
-      ((verify-A A S) =>
-       (post-verify-A S D T))
-      (else #f))))
-
-(define verify-A
-  (lambda (A S)
-    (cond
-      ((null? A) '())
-      ((verify-A (cdr A) S) =>
-       (lambda (A0)
-         (let ((u (walk (lhs (car A)) S))
-               (tag (pr->tag (car A)))
-               (pred (pr->pred (car A))))
-           (cond
-             ((var? u)
-              (cond
-                ((ext-A u tag pred S A0) =>
-                 (lambda (A+)
-                   (append A+ A0)))
-                (else #f)))
-             (else (and (pred u) A0))))))
-      (else #f))))
-
-(define post-verify-A
-  (lambda (S D T)
-    (lambda (A)
-      (let ((D (subsume A D)))
-        (cond
-          ((verify-T T S) => (post-verify-T S D A))
-          (else #f))))))
-
-(define verify-T 
-  (lambda (T S)
-    (cond
-      ((null? T) '())
-      ((verify-T (cdr T) S) => (verify-T+ (lhs (car T)) T S))
-      (else #f))))
-
-(define verify-T+
-  (lambda (x T S)
-    (lambda (T0)
-      (let ((tag (pr->tag (car T)))
-            (pred (pr->pred (car T))))
-	(case-value (walk x S)
-	  ((x) (cond
-                 ((ext-T+ x tag pred S T0) =>
-                  (lambda (T+) (append T+ T0)))
-                 (else #f)))
-          ((au du) (cond
-                     (((verify-T+ au T S) T0) =>
-                      (verify-T+ du T S))
-                     (else #f)))
-          ((u) (and (pred u) T0)))))))
-
-(define post-verify-T
-  (lambda (S D A)
-    (lambda (T)
-      (subsume-T T S (subsume T D) A '()))))
-
-(define subsume-T  
-  (lambda (T+ S D A T)
-    (let ((x* (rem-dups (map lhs A))))
-      (subsume-T+ x* T+ S D A T))))
-
-(define subsume-T+ 
-  (lambda (x* T+ S D A T)
-    (cond
-      ((null? x*)
-       (let ((T (append T+ T)))
-         `(,S ,D ,A ,T)))
-      (else
-       (let ((x (car x*)) (x* (cdr x*)))
-         (let ((D/T (update-D/T x S D A T+)))
-           (let ((D (car D/T)) (T+ (cdr D/T)))
-             (subsume-T+ x* T+ S D A T))))))))
-
-(define update-D/T
-  (lambda (x S D A T)
-    (cond
-      ((null? A)
-       (let ((T (remp (lambda (t)
-                        (eq? (lhs t) x))
-                  T)))
-         `(,D . ,T)))
-      (else
-       (let ((a (car A)))
-         (cond
-           ((and (eq? (lhs a) x)
-              (or (tag=? (pr->tag a) 'sym)   
-                  (tag=? (pr->tag a) 'num)))
-            (update-D/T+ x '() S D T))
-           (else
-	    (update-D/T x S D (cdr A) T))))))))
-
-(define update-D/T+
-  (lambda (x T+ S D T)
-    (cond
-      ((null? T)
-       `(,D . ,T+))
-      (else
-       (let ((t (car T))
-             (T (cdr T)))
-         (cond
-           ((eq? (lhs t) x)
-            (let ((D (ext-D x (pr->tag t) D S)))
-              (update-D/T+ x T+ S D T)))
-           (else
-            (let ((T+ (cons t T+)))
-              (update-D/T+ x T+ S D T)))))))))
-
-(define ext-D
-  (lambda (x tag D S)
-    (cond
-      ((exists 
-         (lambda (d)
-           (and (null? (cdr d))
-             (let ((y (lhs (car d)))
-                   (u (rhs (car d))))
-               (and
-                 (eq? (walk y S) x)
-                 (tag? u)
-                 (tag=? u tag))))) 
-         D)
-       D)
-      (else (cons `((,x . ,tag)) D)))))
-
-(define absento 
-  (lambda (tag u)
-    (cond
-      ((not (tag? tag)) fail)
-      (else
-       (lambdag@ (c : S D A T)
-         (cond
-           ((absento+ u tag c S D A T) => unit)
-           (else (mzero))))))))
-
-(define absento+  
-  (lambda (u tag c S D A T)
-    (case-value (walk u S)
-      ((x)
-       (let ((T+ (ext-T x tag S T)))
-         (cond
-           ((null? T+) c)
-           (else
-            (let ((D (subsume T+ D)))
-              (subsume-T T+ S D A T))))))
-      ((au du)
-       (let ((c (absento+ au tag c S D A T)))
-         (and c
-           (let ((S (c->S c))
-                 (D (c->D c))
-                 (A (c->A c))
-                 (T (c->T c)))
-             (absento+ du tag c S D A T)))))
-      ((u)
-       (cond
-         ((and (tag? u) (tag=? u tag)) #f)
-         (else c))))))
-
-(define ext-T 
-  (lambda (x tag S T)
-    (cond
-      ((null? T)
-       (let ((pred (make-pred-T tag)))
-         `((,x . (,tag . ,pred)))))
-      (else
-       (let ((t (car T)) (T (cdr T)))
-         (let ((t-tag (pr->tag t)))
-           (cond
-             ((eq? (walk (lhs t) S) x)
-              (cond
-                ((tag=? t-tag tag) '())
-                (else (ext-T x tag S T))))
-             ((tag=? t-tag tag)
-              (let ((t-pred (pr->pred t)))
-                (ext-T+ x tag t-pred S T)))
-             (else (ext-T x tag S T)))))))))
-
-(define ext-T+ 
-  (lambda (x tag pred S T)
-    (cond
-      ((null? T) `((,x . (,tag . ,pred))))
-      (else
-       (let ((t (car T)))
-         (let ((t-tag (pr->tag t)))
-           (cond
-             ((eq? (walk (lhs t) S) x)
-              (cond
-                ((tag=? t-tag tag) '())
-                (else
-                 (ext-T+ x tag pred S
-                   (cdr T)))))
-             (else
-              (ext-T+ x tag pred S
-                (cdr T))))))))))
-
-(define make-pred-T
-  (lambda (tag)
-    (lambda (x)
-      (not (and (tag? x) (tag=? x tag))))))
-
-(define tag?
-  (lambda (tag)
-    (symbol? tag)))
-
-(define tag=?
-  (lambda (tag1 tag2)
-    (eq? tag1 tag2)))
-
-(define var (lambda (dummy) (vector dummy)))
-
-(define var? (lambda (x) (vector? x)))
-
-(define rem-dups
-  (lambda (x*)
-    (cond
-      ((null? x*) '())
-      ((memq (car x*) (cdr x*))
-       (rem-dups (cdr x*)))
-      (else (cons (car x*)
-              (rem-dups (cdr x*)))))))
-
-(define lhs (lambda (pr) (car pr)))
-
-(define rhs (lambda (pr) (cdr pr)))
-
-(define succeed (== #f #f))
-
-(define fail (== #f #t))
-
-(define walk
-  (lambda (u S)
-    (cond
-      ((and (var? u) (assq u S)) =>
-       (lambda (pr) (walk (rhs pr) S)))
-      (else u))))
-
-(define unify
-  (lambda (u v S)
-    (let ((u (walk u S)) (v (walk v S)))
-      (cond
-        ((and (pair? u) (pair? v))
-         (let ((S (unify (car u) (car v) S)))
-           (and S (unify (cdr u) (cdr v) S))))
-        (else (unify-nonpair u v S))))))
-
-(define unify-nonpair
-  (lambda (u v S)
-    (cond
-      ((eq? u v) S)
-      ((var? u) (ext-S u v S))
-      ((var? v) (ext-S v u S))
-      ((equal? u v) S)
-      (else #f))))
-
-(define ext-S
-  (lambda (x v S)
-    (case-value v
-      ((y) (cons `(,x . ,y) S))
-      ((au du) (cond
-                 ((occurs-check x v S) #f)
-                 (else (cons `(,x . ,v) S))))
-      ((v) (cons `(,x . ,v) S)))))
-
-(define occurs-check
-  (lambda (x v S)
-    (case-value (walk v S)
-      ((y) (eq? y x))
-      ((av dv) (or (occurs-check x av S)
-                   (occurs-check x dv S)))
-      ((v) #f))))
-
-(define walk*
-  (lambda (v S)
-    (case-value (walk v S)
-      ((x) x)
-      ((av dv)
-       (cons (walk* av S) (walk* dv S)))
-      ((v) v))))
-
-(define reify-S
-  (lambda (v S)
-    (case-value (walk v S)
-      ((x) (let ((n (length S)))
-             (let ((name (reify-name n)))
-               (cons `(,x . ,name) S))))
-      ((av dv) (let ((S (reify-S av S)))
-                 (reify-S dv S)))
-      ((v) S))))
-
-(define reify-name
-  (lambda (n)
-    (string->symbol
-      (string-append "_" "." (number->string n)))))
-
-(define reify
+; (conj f1 f2) looks like a `functional composition' of f2 and f1.
+; Only (f1 x) may return several results, so we have to apply f2 to
+; each of them. 
+; Obviously (conj fail f) and (conj f fail) are both equivalent to fail:
+; they return no results, ever. It that sense, conj is analogous to the
+; logical conjunction.
+(define (conj f1 f2)
   (lambda (x)
-    (lambda (c)
-      (let ((S (c->S c)) (D (c->D c))
-            (A (c->A c)) (T (c->T c)))
-        (let ((v (walk* x S)))
-          (let ((S (reify-S v '())))
-            (reify+ v S
-              (let ((D (remp
-                         (lambda (d) (anyvar? d S))
-                         D)))
-                (rem-subsumed D))
-              (remp
-                (lambda (a)
-                  (var? (walk (lhs a) S)))
-                A)
-              (remp
-                (lambda (t)
-                  (var? (walk (lhs t) S)))
-                T))))))))
+    (apply append (map f2 (f1 x)))))
 
-(define reify+ 
-  (lambda (v S D A T)
-    (let ((D (subsume A D)))
-      (let ((A (map (lambda (a)
-                      (let ((x (lhs a))
-                            (tag (pr->tag a)))
-                        `(,x . ,tag)))
-                    A))
-            (T (map (lambda (t)
-                      (let ((x (lhs t))
-                            (tag (pr->tag t)))
-                        `(,x . ,tag)))
-                    T)))
-        (form (walk* v S)
-              (walk* D S)
-              (walk* A S)
-              (rem-subsumed-T (walk* T S)))))))
 
-(define form
-  (lambda (v D A T)
-    (let ((fd (drop-dot-D (sorter (map sorter D))))
-          (fa (sorter (map sort-part (partition* A))))
-          (ft (drop-dot-T (sorter T))))
-      (let ((fb (append ft fa)))
-        (cond
-          ((and (null? fd) (null? fb)) v)
-          ((null? fd) `(,v . ,fb))
-          ((null? fb) `(,v . ((=/= . ,fd))))
-          (else `(,v (=/= . ,fd) . ,fb)))))))
+; Examples
+(define (cout . args)
+  (for-each display args))
+(define nl #\newline)
 
-(define drop-dot-D
-  (lambda (D)
-    (map (lambda (d)
-           (map (lambda (pr)
-                  (let ((x (lhs pr))
-                        (u (rhs pr)))
-                    `(,x ,u)))
-                d))
-         D)))
+(cout "test1" nl 
+  ((disj 
+     (disj fail succeed) 
+     (conj 
+       (disj (lambda (x) (succeed (+ x 1)))
+	     (lambda (x) (succeed (+ x 10))))
+       (disj succeed succeed)))
+    100)
+  nl)
+; => (100 101 101 110 110)
 
-(define drop-dot-T
-  (lambda (T)
-    (map (lambda (t)
-           (let ((x (lhs t))
-                 (tag (rhs t)))
-             `(absent ,tag ,x)))
-         T)))
 
-(define sorter (lambda (ls) (sort ls lex<=?)))
 
-(define sort-part
-  (lambda (pr)
-    (let ((tag (car pr))
-          (x* (sorter (cdr pr))))
-      `(,tag . ,x*))))
+; Point 2: (Prolog-like) Logic variables
+;
+; One may think of regular variables as `certain knowledge': they give
+; names to definite values.  A logic variable then stands for
+; `improvable ignorance'.  An unbound logic variable represents no
+; knowledge at all; in other words, it represents the result of a
+; measurement _before_ we have done the measurement. A logic variable
+; may be associated with a definite value, like 10. That means
+; definite knowledge.  A logic variable may be associated with a
+; semi-definite value, like (list X) where X is an unbound
+; variable. We know something about the original variable: it is
+; associated with the list of one element.  We can't say though what
+; that element is. A logic variable can be associated with another,
+; unbound logic variable. In that case, we still don't know what
+; precisely the original variable stands for. However, we can say that it
+; represents the same thing as the other variable. So, our
+; uncertainty is reduced.
 
-(define anyvar?
-  (lambda (u S)
-    (case-value u
-      ((x) (var? (walk x S)))
-      ((au du) (or (anyvar? au S)
-                   (anyvar? du S)))
-      ((u) #f))))
+; We chose to represent logic variables as vectors:
+(define (var name) (vector name))
+(define var? vector?)
 
-(define rem-subsumed
-  (lambda (D)
-    (let loop ((D D) (D+ '()))
-      (cond
-        ((null? D) D+)
-        ((or (subsumed? (car D) (cdr D))
-             (subsumed? (car D) D+))
-         (loop (cdr D) D+))
-        (else (loop (cdr D)
-                (cons (car D) D+)))))))
+; We implement associations of logic variables and their values 
+; (aka, _substitutions_) as associative lists of (variable . value)
+; pairs.
+; One may say that a substitution represents our current knowledge
+; of the world.
 
-(define subsumed?
-  (lambda (d D)
+(define empty-subst '())
+(define (ext-s var value s) (cons (cons var value) s))
+
+; Find the value associated with var in substitution s.
+; Return var itself if it is unbound.
+; In miniKanren, this function is called 'walk'
+(define (lookup var s)
+  (cond
+    ((not (var? var)) var)
+    ((assq var s) => (lambda (b) (lookup (cdr b) s)))
+    (else var)))
+
+; There are actually two ways of implementing substitutions as
+; associative list.
+; If the variable x is associated with y and y is associated with 1,
+; we could represent this knowledge as
+; ((x . 1) (y . 1))
+; It is easy to lookup the value associated with the variable then,
+; via a simple assq. OTH, if we have the substitution ((x . y))
+; and we wish to add the association of y to 1, we have
+; to make rearrangements so to produce ((x . 1) (y . 1)).
+; OTH, we can just record the associations as we learn them, without
+; modifying the previous ones. If originally we knew ((x . y))
+; and later we learned that y is associated with 1, we can simply
+; prepend the latter association, obtaining ((y . 1) (x . y)).
+; So, adding new knowledge becomes fast. The lookup procedure becomes
+; more complex though, as we have to chase the chains of variables.
+; To obtain the value associated with x in the latter substitution, we
+; first lookup x, obtain y (another logic variable), then lookup y
+; finally obtaining 1. 
+; We prefer the latter, incremental way of representing knowledge:
+; it is easier to backtrack if we later find out our
+; knowledge leads to a contradiction.
+
+
+; Unification is the process of improving knowledge: or, the process
+; of measurement. That measurement may uncover a contradiction though
+; (things are not what we thought them to be). To be precise, the
+; unification is the statement that two terms are the same. For
+; example, unification of 1 and 1 is successful -- 1 is indeed the
+; same as 1. That doesn't add however to our knowledge of the world. If
+; the logic variable X is associated with 1 in the current
+; substitution, the unification of X with 2 yields a contradiction
+; (the new measurement is not consistent with the previous
+; measurements/hypotheses).  Unification of an unbound logic variable
+; X and 1 improves our knowledge: the `measurement' found that X is
+; actually 1.  We record that fact in the new substitution.
+
+
+; return the new substitution, or #f on contradiction.
+(define (unify t1 t2 s)
+  (let ((t1 (lookup t1 s)) ; find out what t1 actually is given our knowledge s
+	(t2 (lookup t2 s))); find out what t2 actually is given our knowledge s
     (cond
-      ((null? D) #f)
-      (else (let ((d^ (unify* (car D) d)))
-              (or (and d^ (eq? d^ d))
-                  (subsumed? d (cdr D))))))))
+      ((eq? t1 t2) s)		; t1 and t2 are the same; no new knowledge
+      ((var? t1)		; t1 is an unbound variable
+	(ext-s t1 t2 s))
+      ((var? t2)		; t2 is an unbound variable
+	(ext-s t2 t1 s))
+      ((and (pair? t1) (pair? t2)) ; if t1 is a pair, so must be t2
+	(let ((s (unify (car t1) (car t2) s)))
+	  (and s (unify (cdr t1) (cdr t2) s))))
+      ((equal? t1 t2) s)	; t1 and t2 are really the same values
+      (else #f))))
 
-(define rem-subsumed-T
-  (lambda (T)
-    (let loop ((T T) (T^ '()))
-      (cond
-        ((null? T) T^)
-        (else
-         (let ((x (lhs (car T)))
-               (tag (rhs (car T))))
-           (cond
-             ((or (subsumed-T? x tag (cdr T))
-                  (subsumed-T? x tag T^))
-              (loop (cdr T) T^))
-             (else (loop (cdr T)
-                     (cons (car T) T^))))))))))
 
-(define subsumed-T?
-  (lambda (x tag1 T)
+; define a bunch of logic variables, for convenience
+(define vx (var 'x))
+(define vy (var 'y))
+(define vz (var 'z))
+(define vq (var 'q))
+
+(cout "test-u1" nl
+  (unify vx vy empty-subst)
+  nl)
+; => ((#(x) . #(y)))
+
+(cout "test-u2" nl
+  (unify vx 1 (unify vx vy empty-subst))
+  nl)
+; => ((#(y) . 1) (#(x) . #(y)))
+
+(cout "test-u3" nl
+  (lookup vy (unify vx 1 (unify vx vy empty-subst)))
+  nl)
+; => 1 
+; when two variables are associated with each other,
+; improving our knowledge about one of them improves the knowledge of the
+; other
+
+(cout "test-u4" nl
+  (unify (cons vx vy) (cons vy 1) empty-subst)
+  nl)
+; => ((#(y) . 1) (#(x) . #(y)))
+; exactly the same substitution as in test-u2
+
+
+
+; Part 3: Logic system
+;
+; Now we can combine non-deterministic functions (Part 1) and
+; the representation of knowledge (Part 2) into a logic system.
+; We introduce a 'goal' -- a non-deterministic function that takes
+; a substitution and produces 0, 1 or more other substitutions (new
+; knowledge). In case the goal produces 0 substitutions, we say that the
+; goal failed. We will call any result produced by the goal an 'outcome'.
+
+; The functions 'succeed' and 'fail' defined earlier are obviously
+; goals.  The latter is the failing goal. OTH, 'succeed' is the
+; trivial successful goal, a tautology that doesn't improve our
+; knowledge of the world. We can now add another primitive goal, the
+; result of a `measurement'.  The quantum-mechanical connotations of
+; `the measurement' must be obvious by now.
+
+(define (== t1 t2)
+  (lambda (s)
     (cond
-      ((null? T) #f)
-      (else
-       (let ((y (lhs (car T)))
-             (tag2 (rhs (car T))))
-         (or
-           (and (eq? y x) (tag=? tag2 tag1))
-           (subsumed-T? x tag1 (cdr T))))))))
+      ((unify t1 t2 s) => succeed)
+      (else (fail s)))))
 
-(define unify*
-  (lambda (S+ S)
-    (unify (map lhs S+) (map rhs S+) S)))
 
-(define part
-  (lambda (tag A x* y*)
+; We also need a way to 'run' a goal,
+; to see what knowledge we can obtain starting from sheer ignorance
+(define (run g) (g empty-subst))
+
+
+; We can build more complex goals using lambda-abstractions and previously
+; defined combinators, conj and disj.
+; For example, we can define the function `choice' such that
+; (choice t1 a-list) is a goal that succeeds if t1 is an element of a-list.
+
+(define (choice var lst)
+  (if (null? lst) fail
+    (disj
+      (== var (car lst))
+      (choice var (cdr lst)))))
+
+(cout "test choice 1" nl
+  (run (choice 2 '(1 2 3)))
+  nl)
+; => (()) success
+
+(cout "test choice 2" nl
+  (run (choice 10 '(1 2 3)))
+  nl)
+; => ()
+; empty list of outcomes: 10 is not a member of '(1 2 3)
+
+(cout "test choice 3" nl
+  (run (choice vx '(1 2 3)))
+  nl)
+; => (((#(x) . 1)) ((#(x) . 2)) ((#(x) . 3)))
+; three outcomes
+
+; The name `choice' should evoke The Axiom of Choice...
+
+; Now we can write a very primitive program: find an element that is
+; common in two lists:
+
+(define (common-el l1 l2)
+  (conj
+    (choice vx l1)
+    (choice vx l2)))
+
+(cout "common-el-1" nl
+  (run (common-el '(1 2 3) '(3 4 5)))
+  nl)
+; => (((#(x) . 3)))
+
+(cout "common-el-2" nl
+  (run (common-el '(1 2 3) '(3 4 1 7)))
+  nl)
+; => (((#(x) . 1)) ((#(x) . 3)))
+; two elements are in common
+
+(cout "common-el-3" nl
+  (run (common-el '(11 2 3) '(13 4 1 7)))
+  nl)
+; => ()
+; nothing in common
+
+
+; Let us do something a bit more complex
+
+(define (conso a b l) (== (cons a b) l))
+
+; (conso a b l) is a goal that succeeds if in the current state
+; of the world, (cons a b) is the same as l.
+; That may, at first, sound like the meaning of cons. However, the
+; declarative formulation is more powerful, because a, b, or l might
+; be logic variables.
+;
+; By running the goal which includes logic variables we are
+; essentially asking the question what the state of the world should
+; be so that (cons a b) could be the same as l.
+
+(cout "conso-1" nl
+  (run (conso 1 '(2 3) vx))
+  nl)
+; => (((#(x) 1 2 3))) === (((#(x) . (1 2 3))))
+
+(cout "conso-2" nl
+  (run (conso vx vy (list 1 2 3)))
+  nl)
+; => (((#(y) 2 3) (#(x) . 1)))
+; That looks now like 'cons' in reverse. The answer means that
+; if we replace vx with 1 and vy with (2 3), then (cons vx vy)
+; will be the same as '(1 2 3)
+
+; Terminology: (conso vx vy '(1 2 3)) is a goal (or, to be more precise,
+; an expression that evaluates to a goal). By itself, 'conso'
+; is a parameterized goal (or, abstraction over a goal):
+; conso === (lambda (x y z) (conso x y z))
+; We will call such an abstraction 'relation'.
+
+; Let us attempt a more complex relation: appendo
+; That is, (appendo l1 l2 l3) holds if the list l3 is the
+; concatenation of lists l1 and l2.
+; The first attempt:
+
+(define (apppendo l1 l2 l3)
+  (disj
+    (conj (== l1 '()) (== l2 l3))    ; [] ++ l == l
+    (let ((h (var 'h)) (t (var 't))  ; (h:t) ++ l == h : (t ++ l)
+	  (l3p (var 'l3p)))
+      (conj
+	(conso h t l1)
+	(conj
+	  (conso h l3p l3)
+	  (apppendo t l2 l3p))))))
+
+; If we run the following, we get into the infinite loop.
+; (cout "t1"
+;   (run (apppendo '(1) '(2) vq))
+;   nl)
+
+; It is instructive to analyze why. The reason is that 
+; (apppendo t l2 l3p) is a function application in Scheme,
+; and so the (call-by-value) evaluator tries to find its value first,
+; before invoking (conso h t l1). But evaluating (apppendo t l2 l3p)
+; will again require the evaluation of (apppendo t1 l21 l3p1), etc.
+; So, we have to introduce eta-expansion. Now, the recursive
+; call to apppendo gets evaluated only when conj applies
+; (lambda (s) ((apppendo t l2 l3p) s)) to each result of (conso h l3p l3).
+; If the latter yields '() (no results), then appendo will not be
+; invoked. Compare that with the situation above, where appendo would 
+; have been invoked anyway.
+
+(define (apppendo l1 l2 l3)
+  (disj                              ; In Haskell notation:
+    (conj (== l1 '()) (== l2 l3))    ; [] ++ l == l
+    (let ((h (var 'h)) (t (var 't))  ; (h:t) ++ l == h : (t ++ l)
+	  (l3p (var 'l3p)))
+      (conj
+	(conso h t l1)
+	(lambda (s)
+	((conj
+	  (conso h l3p l3)
+	  (lambda (s)
+	   ((apppendo t l2 l3p) s))) s))))))
+
+(cout "t1" nl
+  (run (apppendo '(1) '(2) vq))
+  nl)
+; => (((#(l3p) 2) (#(q) #(h) . #(l3p)) (#(t)) (#(h) . 1)))
+
+; That all appears to work, but the result is kind of ugly;
+; and all the eta-expansion spoils the code.
+
+; To hide the eta-expansion (that is, (lambda (s) ...) forms),
+; we have to introduce a bit of syntactic sugar:
+
+(define-syntax conj*
+  (syntax-rules ()
+    ((conj*) succeed)
+    ((conj* g) g)
+    ((conj* g gs ...)
+      (conj g (lambda (s) ((conj* gs ...) s))))))
+
+; Incidentally, for disj* we can use a regular function
+; (because we represent all the values yielded by a non-deterministic
+; function as a regular list rather than a lazy list). All branches
+; of disj will be evaluated anyway, in our present model.
+(define (disj* . gs)
+  (if (null? gs) fail
+    (disj (car gs) (apply disj* (cdr gs)))))
+
+; And so we can re-define appendo as follows. It does look
+; quite declarative, as the statement of two equations that
+; define what list concatenation is.
+
+(define (apppendo l1 l2 l3)
+  (disj                              ; In Haskell notation:
+    (conj* (== l1 '()) (== l2 l3))   ; [] ++ l == l
+    (let ((h (var 'h)) (t (var 't))  ; (h:t) ++ l == h : (t ++ l)
+	  (l3p (var 'l3p)))
+      (conj*
+	(conso h t l1)
+	(conso h l3p l3)
+	(apppendo t l2 l3p)))))
+
+
+; We also would like to make the result yielded by run more
+; pleasant to look at.
+; First of all, let us assume that the variable vq (if bound),
+; holds the answer to our inquiry. Thus, our new run will try to
+; find the value associated with vq in the final substitution.
+; However, the found value may itself contain logic variables.
+; We would like to replace them, too, with their associated values,
+; if any, so the returned value will be more informative.
+
+; We define a more diligent version of lookup, which replaces
+; variables with their values even if those variables occur deep
+; inside a term.
+
+(define (lookup* var s)
+  (let ((v (lookup var s)))
     (cond
-     ((null? A)
-      (cons `(,tag . ,x*) (partition* y*)))
-     ((tag=? (rhs (car A)) tag)
-      (let ((x (lhs (car A))))
-        (let ((x* (cond
-                    ((memq x x*) x*)
-                    (else (cons x x*)))))
-          (part tag (cdr A) x* y*))))
-     (else
-      (let ((y* (cons (car A) y*)))
-        (part tag (cdr A) x* y*))))))
+      ((var? v) v)			; if lookup returned var, it is unbound
+      ((pair? v)
+	(cons (lookup* (car v) s)
+	      (lookup* (cdr v) s)))
+      (else v))))
 
-(define partition*
-  (lambda (A)
-    (cond
-      ((null? A) '())
-      (else
-       (part (rhs (car A)) A '() '())))))
+; We can now redefine run as
 
-(define lex<=?
-  (lambda (x y)
-    (string<=? (datum->string x) (datum->string y))))
+(define (run g)
+  (map (lambda (s) (lookup* vq s)) (g empty-subst)))
 
-(define datum->string
-  (lambda (x)
-    (call-with-string-output-port
-      (lambda (p) (display x p)))))
+; and we can re-run the test
 
-(define-syntax project
-  (syntax-rules ()
-    ((_ (x ...) g g* ...)
-     (lambdag@ (c : S D A T)
-       (let ((x (walk* x S)) ...)
-         ((fresh () g g* ...) c))))))
+(cout "t1" nl
+  (run (apppendo '(1) '(2) vq))
+  nl)
+; => ((1 2))
 
-(define-syntax conda
-  (syntax-rules ()
-    ((_ (g0 g ...) (g1 g^ ...) ...)
-     (lambdag@ (c)
-       (inc
-         (ifa ((g0 c) g ...)
-              ((g1 c) g^ ...) ...))))))
+(cout "t2" nl
+  (run (apppendo '(1) '(2) '(1)))
+  nl)
+; => ()
+; That is, concatenation of '(1) and '(2) is not the same as '(1)
 
-(define-syntax ifa
-  (syntax-rules ()
-    ((_) (mzero))
-    ((_ (e g ...) b ...)
-     (let loop ((c-inf e))
-       (case-inf c-inf
-         (() (ifa b ...))
-         ((f) (inc (loop (f))))
-         ((a) (bind* c-inf g ...))
-         ((a f) (bind* c-inf g ...)))))))
+(cout "t3" nl
+  (run (apppendo '(1 2 3) vq '(1 2 3 4 5)))
+  nl)
+; => ((4 5))
 
-(define-syntax condu
-  (syntax-rules ()
-    ((_ (g0 g ...) (g1 g^ ...) ...)
-     (lambdag@ (c)
-       (inc
-         (ifu ((g0 c) g ...)
-              ((g1 c) g^ ...) ...))))))
 
-(define-syntax ifu
-  (syntax-rules ()
-    ((_) (mzero))
-    ((_ (e g ...) b ...)
-     (let loop ((c-inf e))
-       (case-inf c-inf
-         (() (ifu b ...))
-         ((f) (inc (loop (f))))
-         ((c) (bind* c-inf g ...))
-         ((c f) (bind* (unit c) g ...)))))))
+(cout "t4" nl
+  (run (apppendo vq '(4 5) '(1 2 3 4 5)))
+  nl)
+; => ((1 2 3))
 
-(define onceo (lambda (g) (condu (g))))
+(cout "t5" nl
+  (run (apppendo vq vx '(1 2 3 4 5)))
+  nl)
+; => (() (1) (1 2) (1 2 3) (1 2 3 4) (1 2 3 4 5))
+; All prefixes of '(1 2 3 4 5)
 
-(pk (run* (q)
-          (fresh (x y)
-          (== x 42)
-          (== y 12)
-          (== q (list x y)))))
+
+(cout "t6" nl
+  (run (apppendo vx vq '(1 2 3 4 5)))
+  nl)
+; => ((1 2 3 4 5) (2 3 4 5) (3 4 5) (4 5) (5) ())
+; All suffixes of '(1 2 3 4 5)
+
+
+(cout "t7" nl
+  (run (let ((x (var 'x)) (y (var 'y)))
+	 (conj* (apppendo x y '(1 2 3 4 5))
+	        (== vq (list x y)))))
+  nl)
+; => ((() (1 2 3 4 5)) ((1) (2 3 4 5)) ((1 2) (3 4 5))
+;     ((1 2 3) (4 5)) ((1 2 3 4) (5)) ((1 2 3 4 5) ()))
+; All the ways to split (1 2 3 4 5) into two complementary parts
+
+
+; For more detail, please see `The Reasoned Schemer'
