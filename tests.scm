@@ -1,14 +1,16 @@
 #!/usr/bin/env guile
 !#
 
-(use-modules (srfi srfi-64)) ;; unit test framework
+(use-modules (srfi srfi-64))  ;; unit test framework
+(use-modules (srfi srfi-41))  ;; stream
 
 (use-modules (culturia))
 
-
 (test-begin "main")
 
+
 ;;; path utils
+
 
 (define (path-join . rest)
   "Return the absolute path made of REST. If the first item
@@ -18,6 +20,7 @@
     (if (string-prefix? "/" path)
         path
         (string-append (getcwd) "/" path))))
+
 
 (define (path-dfs-walk dirpath proc)
   (define dir (opendir dirpath))
@@ -34,16 +37,19 @@
   (closedir dir)
   (proc (path-join dirpath)))
 
+
 (define (rmtree path)
   (path-dfs-walk path (lambda (path)
                         (if (equal? (stat:type (stat path)) 'directory)
                             (rmdir path)
                             (delete-file path)))))
 
+
 (define-syntax-rule (with-directory path e ...)
   (begin
     (when (access? path F_OK)
       (rmtree path))
+    (mkdir path)
     e ...
     (rmtree path)))
 
@@ -51,35 +57,41 @@
 (test-group "culturia"
 
   (with-directory "/tmp/culturia"
-                  (let* ((culturia (culturia-create "/tmp/culturia"))
-                         (atom (culturia-atom-create culturia "test" "name")))
+                  (let* ((culturia (open-culturia "/tmp/culturia"))
+                         (atom (create-atom culturia (list (cons "name" "Kely Vaue")))))
+
                     ;; a few sanity tests
-                    (test-equal "empty outgoings" (atom-outgoings atom) (list))
-                    (test-equal "empty incomings" (atom-incomings atom) (list))
-                    (test-equal "empty assoc" (atom-assoc atom) (list))
+                    (test-equal "empty outgoings"
+                      (stream->list (atom-outgoings atom))
+                      (list))
 
-                    (let ((idem (culturia-atom-ref/uid culturia (atom-uid atom))))
-                      (test-equal "atom-assoc-equal" (atom-assoc atom) (atom-assoc idem)))
+                    (test-equal "empty incomings"
+                      (stream->list (atom-incomings atom))
+                      (list))
 
-                    (let ((idem (culturia-atom-ref culturia "test" "name")))
-                      (test-equal "culturia-atom-ref/type+name" (atom-uid atom) (atom-uid idem)))
+                    (test-equal "assoc" (atom-assoc atom) (list (cons "name" "Kely Vaue")))
 
-                    (let ((atoms (culturia-atom-ref culturia "test")))
-                      (test-equal "culturia-atom-ref/type" atoms (list (atom-uid atom))))
+                    (let ((idem (culturia-ref culturia (atom-uid atom))))
+                      (test-equal "atom-assoc is equal" (atom-assoc atom) (atom-assoc idem)))
 
                     ;;
-                    (atom-assoc-set! atom 'key "value")
-                    (test-equal "atom-assoc-set" (atom-assoc-ref atom 'key) "value")
+                    (let ((atom! (atom-set atom "name" "Vaue Kely")))
+                      (test-equal "atom-set" (atom-ref atom! "name") "Vaue Kely")
 
-                    (let ((other (culturia-atom-create culturia "test" "other")))
-                      (atom-link atom other)
-                      (test-equal "not empty outgoings" (atom-outgoings atom) (list (atom-uid other)))
-                      (test-equal "not empty incomings" (atom-incomings other) (list (atom-uid atom))))
 
+                      (let ((other (create-atom culturia (list (cons "name" "Oter Ahtom")))))
+                        ;; prepare
+                        (atom-link atom other)
+                        
+                        ;; tests
+                        (test-equal "not empty outgoings"
+                        (stream->list (atom-outgoings atom)) (list other))
+                        
+                        (test-equal "not empty incomings"
+                                    (stream->list (atom-incomings other)) (list atom!))))
+
+                    
                     (culturia-close culturia)
-
-
-                  ;; (test-equal "smoke" (list 1 2) (list 1 2))
                     )
                   ))
 
