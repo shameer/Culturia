@@ -69,13 +69,10 @@ Done:
 Goals:
 
 - Put automous code into a single file
-- Implement `gremlin` hypergraph traversal framework
-- Implement z-order index
-- Implement timeseries
-- Implement fuzzy search of names
+- `gremlin` is actually srfi 41 with a probably some specific stream proc
+- Implement user defined indices with z-index, trigrams, fulltext
 - Implement explorer GUI
-- Load conceptnet
-- Load wordnet
+- Load conceptnet, wordnet, wikidata
 - Study PageRank like algorithms (SimRank, Personnalized SimRank)
 - Study CoSimRank
 - LexRank & TextRank summarization
