@@ -1,6 +1,6 @@
 (define-module (culturia))
 
-(use-modules (culturia wiredtiger))
+(use-modules (wiredtiger))
 
 (use-modules (rnrs hashtables))
 
