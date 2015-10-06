@@ -53,3 +53,19 @@
 
 (define-record-type* <revision> culturia uid parent name comment path cultures-tree)
 (define-record-type* <culture> revision uid parent name comment)
+
+
+(define (lookup prefix cursor)
+  (with-cursor cursor
+    (cursor-key-set cursor prefix)
+    (if (cursor-search-near cursor)
+        (let loop ((atoms (list)))
+          ;; make sure it did not go beyond the keys
+          ;; we are interested in
+          (if (prefix? prefix (cursor-key-ref cursor))
+              (let ((atoms (cons (cursor-value-ref cursor) atoms)))
+                ;; is there any other key in the hashmap?
+                (if (cursor-next cursor)
+                    (loop atoms)
+                    atoms))))
+        (list))))
