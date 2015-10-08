@@ -95,6 +95,8 @@
   arrows-append
   arrows-outgoings ;; cursor for fetching outgoings set
   arrows-incomings
+  ;; indexers
+  indexers
   )
 
 
@@ -106,8 +108,160 @@
 
 ;; ---
 
+;;; user defined indices
 
-(define-public (open-culturia path)
+(define-record-type* <indexer>
+  keys
+  cursor
+  cursor-append
+  cursor-rindex§
+
+
+(define (indexers->assoc indexers)
+  (map (lambda (indexer)
+         (cons (indexer-keys indexer) indexer))
+       indexers))
+
+
+(define-public (culturia-create-indexer name keys)
+  (lambda (session)
+    (let ((table (string-append "table:" name))
+          (reverse-index (string-append "index:" name ":reverse")))
+
+      (session-create session
+                      table
+                      "key_format=r,value_format=uQ,columns=(key,znumber,uid)")
+
+      (session-create session
+                      reverse-index
+                      "columns=(znumber,uid)")
+
+      (make-indexer name
+                    keys
+                    (cursor-open session table)
+                    (cursor-open session table "append")
+                    (cursor-open session (string-append reverse-index "(key)"))))))
+
+
+(define (culturia-indexer-ref culturia keys)
+  (assoc-ref (culturia-indexers culturia) keys))
+
+
+(define (atom-ref* atom keys)
+  "Retrieve all KEYS from atom or nothing"
+  (let loop ((keys keys)
+             (out (list)))
+    (if (null? keys)
+        out
+        (if (atom-ref (car keys))
+            (loop (cdr keys) (append values (list (atom-ref (car names)))))
+            (list)))))
+
+
+(define (cursor-ref* cursor . key)
+  (with-cursor cursor
+    (apply cursor-key-set (append (list cursor) key))
+    (if (cursor-search cursor)
+        (cursor-value-ref cursor)
+        #nil)))
+
+
+(define (cursor-remove* cursor . key)
+  (with-cursor cursor
+    (apply cursor-key-set (list cursor) key)
+    (cursor-search cursor)
+    (cursor-remove cursor)))
+
+
+(define (cursor-insert* cursor key value)
+  (apply cursor-key-set (list cursor) key)
+  (apply cursor-value-set (list cursor) value)
+  (cursor-insert cursor))
+
+
+(define-public (culturia-index-remove culturia keys atom)
+  "Remove previous reference to ATOM in the index NAME"
+  (let* ((session (culturia-session culturia))
+         (indexer (culturia-indexer-ref culturia name))
+         (znumber (zpack* indexer))
+         (uid (atom-uid atom)))
+    ;; remove entry
+    (let ((key (cursor-ref* (indexer-rindex indexer) znumber uid)))
+      (when key
+        (cursor-remove* (indexer-cursor indexer) key)))))
+
+
+(define-public (culturia-index-insert culturia keys atom)
+  "Insert atom inside the indexer NAME"
+  (let* ((session (culturia-session culturia))
+         (indexer (culturia-indexer-ref culturia keys))
+         (znumber (zpack* (atom-ref* atom keys)))
+         (uid (atom-uid atom)))
+    (cursor-insert* (indexer-cursor indexer) (list znumber uid) (list uid))))
+
+
+;; culturia-index-ref
+
+(define (cursor-search-near* cursor key)
+  "Search near KEY on CURSOR and prepare a forward range"
+  (apply cursor-key-set (append (list cursor) key))
+  (let ((code (cursor-search-near cursor)))
+    (if (not code)
+        #false
+        (if (eq? (code -1))
+            (if (cursor-next cursor)
+                #true
+                #false)
+            #true))))
+
+
+(define (cursor-search-near* cursor key)
+  (apply cursor-key-set (append (list cursor) key))
+  (cursor-search-near cursor))
+
+
+(define (cursor-map* next? proc cursor)
+  (let loop ((out (list))
+             (next #true))
+    (if next
+        (loop (cons (proc (cursor-key-ref cursor) (cursor-value-ref cursor)) out)
+              (next?))
+        out)))
+
+
+(define (prefix? key other)
+  "Return #true if OTHER has KEY as prefix"
+  ;; filter "empty" values from the key
+  (define (empty? x) (or (null? x) (equal? x "") (eq? x #vu8())))
+  (define (predicate a b) (not (or (empty? a) (equal? a b))))
+  (not (any predicate key other)))
+
+
+(define (cursor-near* cursor . key)
+  "Return CURSOR range association where keys match PREFIX"
+  (define (next?)
+    (if (cursor-next cursor)
+        (prefix? key (cursor-key-ref cursor))
+        #false))
+
+  (with-cursor cursor
+    (if (apply cursor-search* (append (list cursor) prefix))
+        (cursor-map* next? cons cursor)
+        (list))))
+
+
+(define-public (culturia-index-ref culturia name assoc)
+  (let* ((keys (map car assoc))
+         (indexer (culturia-indexer-ref culturia keys))
+         (cursor (indexer-cursor-rindex indexer))
+         (znumber (zpack (map cdr assoc))))
+    (if (cursor-search-near* cursor znumber 0)
+        (cursor-range* cursor znumber 0)))
+
+
+;; ---
+
+(define-public (open-culturia path indexers)
   (let* ((connection (connection-open path "create"))
          (session (session-open connection)))
     ;; create a main table to store <atom>
@@ -138,8 +292,20 @@
                    (cursor-open session "table:arrows")
                    (cursor-open session "table:arrows" "append")
                    (cursor-open session "index:arrows:outgoings(uid,end)")
-                   (cursor-open session "index:arrows:incomings(uid,start)"))))
+                   (cursor-open session "index:arrows:incomings(uid,start)")
+                   ;; indexers
+                   (let next ((indexers indexers)
+                              (out (list)))
+                     (if (null? indexers)
+                         out
+                         (next (cdr indexers)
+                               (cons out ((car indexers) session))))))))
 
+
+
+;; ---
+
+;;; transactions procedures
 
 (define-public (culturia-close culturia)
   (connection-close (culturia-connection culturia)))
@@ -242,6 +408,7 @@
           (if (eq? (atom-uid other) (car (cursor-value-ref cursor)))
               (cursor-remove cursor)
               (loop (cursor-next)))))))
+
 
 ;; arrows stream
 
