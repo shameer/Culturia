@@ -35,8 +35,12 @@
               (append out (list (list->integer (take zbits 8))))))))
         
 
-(define-public (zpack . vs)
+(define-public (zpack vs)
   (zbits->bv (zbits vs)))
+
+
+(define-public (zpack* vs)
+  (zpack (map (lambda (v) (if (string? v) (string-hash v) v)) vs)))
 
 
 ;; zunpack
