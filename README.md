@@ -15,10 +15,15 @@ The name is a reference to
 Done:
 
 - basic hypergraph cf. HACKING.md 
+- implement zorder packing aka. morton code
 
 Goals:
 
-- Implement user defined indices with z-index, trigrams, fulltext
+- Implement user defined indices with z-index
+- Explore quepy
+- Implement chat-80
+- Implement user defined indices with z-trigrams, fulltext
+- Implement recursive culture
 - Implement a blackboard system
 - `gremlin` is actually srfi 41 with a probably some specific stream proc
 - Implement explorer GUI
