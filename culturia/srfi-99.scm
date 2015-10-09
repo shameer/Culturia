@@ -41,3 +41,8 @@
              pred
              (field getter)
              ...))))))
+
+(export define-record-type*)
+(re-export set-record-type-printer!)
+(re-export set-field)
+
