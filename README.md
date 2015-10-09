@@ -19,10 +19,12 @@ Done:
 
 Goals:
 
-- Implement user defined indices with z-index
+- z-index
+- trigram index
 - Explore quepy
 - Implement chat-80
-- Implement user defined indices with z-trigrams, fulltext
+- NLP tools
+- full text index
 - Implement recursive culture
 - Implement a blackboard system
 - `gremlin` is actually srfi 41 with a probably some specific stream proc
