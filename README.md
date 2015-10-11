@@ -135,4 +135,5 @@ I discovered #ai@freenode.net and met a few interesting people.
 
 Also, I'm still wondering what will be the main goal. I thinking about Q/A and
 summarization. Q/A seems more involving. I need to have a look at NLP coursera
-again.
+again. Or maybe, I should just code whatever comes to my mind and forget about
+this setting any goal...
