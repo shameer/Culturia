@@ -628,12 +628,3 @@
 
 (define-public (cursor-close cursor)
   ((%cursor-close cursor)))
-
-;;; helper for reseting cursors should be in wiredtiger
-;; @@@: emacs: (put 'with-cursor 'scheme-indent-function 1)
-(define-syntax-rule (with-cursor cursor e ...)
-  (let ((out (begin e ...)))
-    (cursor-reset cursor)
-    out))
-
-(export with-cursor)
