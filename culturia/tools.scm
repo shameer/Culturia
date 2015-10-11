@@ -1,6 +1,6 @@
 (define-module (tools))
 
-(define (print . rest)
+(define-public (print . rest)
   (let ((template (reverse (cdr (reverse rest))))
         (parameters (car (reverse rest))))
     (let loop ((template template)
@@ -13,6 +13,22 @@
               (begin (display (car template))
                      (loop (cdr template) parameters)))))))
 
-(define (~s s) (format #true "~s" s))
+(define-public (~s s) (format #true "~s" s))
+(define-public (~a s) (format #true "~a" s))
 
-(print  "Héllo World, " ~s (list "you-name-it"))
+;; (print  "Héllo World, " ~s (list "you-name-it"))
+
+
+
+(define-syntax test-check
+  (syntax-rules ()
+    ((_ title tested-expression expected-result)
+     (begin
+       (print "* Checking " ~s (list title))
+       (let* ((expected expected-result)
+              (produced tested-expression))
+         (if (not (equal? expected produced))
+             (begin (print "Expected: " ~a (list expected))
+                    (print "Computed: " ~a (list produced)))))))))
+
+(export test-check)
