@@ -1,5 +1,14 @@
 (define-module (tools))
 
+;;;
+;;; print
+;;;
+;;
+;; nicer format
+;;
+;; (print  "Héllo World, " ~s (list "you-name-it"))
+;;
+
 (define-public (print . rest)
   (let ((template (reverse (cdr (reverse rest))))
         (parameters (car (reverse rest))))
@@ -16,9 +25,9 @@
 (define-public (~s s) (format #true "~s" s))
 (define-public (~a s) (format #true "~a" s))
 
-;; (print  "Héllo World, " ~s (list "you-name-it"))
-
-
+;;;
+;;; test-check
+;;;
 
 (define-syntax test-check
   (syntax-rules ()
@@ -32,3 +41,23 @@
                     (print "Computed: " ~a (list produced)))))))))
 
 (export test-check)
+
+;;;
+;;; exceptions
+;;;
+;;
+;; helper for managing exceptions
+
+(define-public (make-exception name)
+  "Generate a unique symbol prefixed with NAME"
+  (gensym (string-append "culturia-" name "-")))
+
+(define-public *exception* (make-exception "exception"))
+
+(define-public (raise message . rest)
+  "shorthand to throw EXCEPTION with MESSAGE formated with REST"
+  (throw *exception* (apply format (append (list #false message) rest))))
+
+;; well, i'm too lazy to create other exception messages
+(define-public (Oops!)
+  (raise "Oops!"))
