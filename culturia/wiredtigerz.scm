@@ -318,7 +318,7 @@
   (with-cursor cursor
     (if (apply cursor-search-near* (cons cursor key-prefix))
         (let loop ((out (list))
-                   (next #true))
+                   (next (prefix? key-prefix (cursor-key-ref cursor))))
           (if next
               (loop (acons (cursor-key-ref cursor) (cursor-value-ref cursor) out)
                     (next?))
