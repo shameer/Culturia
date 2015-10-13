@@ -416,6 +416,7 @@
 
 (define *item->value* `((#\S . ,item->string)
                         (#\Q . ,item->integer)
+                        (#\q . ,item->integer)                        
                         (#\r . ,item->integer)))
 
 (define (pointers->scm formats pointers)
@@ -466,6 +467,7 @@
 
 (define *format->pointer* `((#\S . ,make-string-pointer)
                             (#\Q . ,make-pointer)
+                            (#\q . ,make-pointer)                            
                             (#\r . ,make-pointer)))
 
 (define (formats->items formats values)
