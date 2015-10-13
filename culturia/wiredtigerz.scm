@@ -3,6 +3,7 @@
 (use-modules (ice-9 match))
 (use-modules (ice-9 receive))
 
+(use-modules (srfi srfi-1))  ;; append-map
 (use-modules (srfi srfi-9))  ;; records
 (use-modules (srfi srfi-9 gnu))  ;; set-record-type-printer!
 (use-modules (srfi srfi-26))  ;; cut
@@ -101,7 +102,7 @@
   ;; we wait for `session-create` arguments instead.
   ;; This makes the code easier to test...
   (define (create args)
-    (apply session-create (append (list session) args)))
+    (apply session-create (cons session args)))
   ;; prepare arguments for every config and apply them
   (for-each create (append-map config-prepare-create configs)))
 
@@ -167,9 +168,9 @@
   ;; XXX: just like session-open* we expect cursor-open arguments
   ;; but this time we return an assoc made of ('cursor-name . cursor)
   (define (open name+args)
-    (cons (car name+args) (apply cursor-open (append (list session) (cdr name+args)))))
+    (cons (car name+args) (apply cursor-open (cons session (cadr name+args)))))
   ;; prepare arguments for every config and apply them
-  (for-each open (append-map config-prepare-open configs)))
+  (map open (append-map config-prepare-open configs)))
 
 
 (define (config-prepare-open config)
@@ -218,9 +219,25 @@
           (list cursor-name
                 (list (format #false "index:~a:~a(~a)" name (index-name index) columns)))))))
 
+;;;
+;;; database-create
+;;;
+;;
+;; Create database and return a connection with its cursors
+;;
+
+(define (wiredtiger-open path config)
+  (let* ((connection (connection-open path "create"))
+         (session (session-open connection)))
+    (session-create* session config)
+    (values (cons connection session) (cursor-open* session config))))
+
+
+(define (wiredtiger-close database)
+  (connection-close (car database)))
 
 ;;;
-;;; cursor navigation
+;;; Cursor navigation
 ;;;
 ;;
 ;; Quickly operate on cursors
@@ -246,13 +263,15 @@
 
 
 (define-public (cursor-insert* cursor key value)
-  (apply cursor-key-set (cons cursor key))
+  (when (not (null? key))
+    (apply cursor-key-set (cons cursor key)))
   (apply cursor-value-set (cons cursor value))
   (cursor-insert cursor))
 
 
 (define-public (cursor-update* cursor key value)
-  (apply cursor-key-set (cons cursor key))
+  (when (not (null? key))
+    (apply cursor-key-set (cons cursor key)))
   (apply cursor-value-set (cons cursor value))
   (cursor-update cursor))
 
@@ -260,6 +279,11 @@
 (define-public (cursor-remove* cursor . key)
   (apply cursor-key-set (cons cursor key))
   (cursor-remove cursor))
+
+
+(define-public (cursor-search* cursor . key)
+  (apply cursor-key-set (cons cursor key))
+  (cursor-search cursor))
 
 
 (define-public (cursor-search-near* cursor . key-prefix)
@@ -279,7 +303,7 @@
 (define-public (prefix? prefix other)
   "Return #true if OTHER has KEY as prefix"
   ;; filter "empty" values from the key
-  (define (empty? x) (or (null? x) (equal? x "") (eq? x #vu8())))
+  (define (empty? x) (or (eq? x 0) (equal? x "") (eq? x #vu8())))
   (define (predicate? a b) (not (or (empty? a) (equal? a b))))
   (not (any predicate? prefix other)))
 
@@ -306,12 +330,15 @@
 ;;; tests
 ;;;
 
-(use-modules (tools))
+(use-modules (tools))  ;; test-check
+(use-modules (path))  ;; with-directory
+(use-modules (ice-9 receive))
+
 
 (when (getenv "CHECK")
 
   ;;; test declarative API
-  
+
   (test-check "create table config without index"
               (config-prepare-create '(atoms
                                        ((uid . record))
@@ -350,4 +377,78 @@
                     (list 'atoms-reversex (list "index:atoms:reversex(uid)"))
                     (list 'atoms-reverse (list "index:atoms:reverse"))))
 
+  (with-directory
+   "/tmp/culturia" (receive (db cursors)
+                       (wiredtiger-open "/tmp/culturia"
+                                        '(table ((key . record)) ((value . integer)) ()))
+                     (test-check "wiredtiger-open"
+                                 db
+                                 db)
+                    (wiredtiger-close db)))
+
+  (with-directory
+   "/tmp/culturia" (receive (db cursors)
+                       (wiredtiger-open "/tmp/culturia"
+                                        '(table ((key . record)) ((value . integer)) ()))
+                     (test-check "cursor-insert* and cursor-search*"
+                                 (let ((cursor (assoc-ref cursors 'table))
+                                       (append (assoc-ref cursors 'table-append)))
+                                   (cursor-insert* append #nil (list 42))
+                                   (cursor-insert* append #nil (list 1337))
+                                   (cursor-insert* append #nil (list 1985))
+                                   (cursor-search* cursor 1)
+                                   (cursor-value-ref cursor))
+                                 (list 42))
+                    (wiredtiger-close db)))
+
+
+  (with-directory
+   "/tmp/culturia" (receive (db cursors)
+                       (wiredtiger-open "/tmp/culturia"
+                                        '(table ((a . integer) (b . integer)) ((c . integer)) ()))
+                     (test-check "cursor-range"
+                                 (let ((cursor (assoc-ref cursors 'table)))
+                                   (cursor-insert* cursor (list 0 0) (list 0))
+                                   (cursor-insert* cursor (list 1 1) (list 1))
+                                   (cursor-insert* cursor (list 1 2) (list 1))
+                                   (cursor-insert* cursor (list 2 0) (list 2))
+                                   (cursor-range cursor 1 0))
+                                 '(((1 2) 1)
+                                   ((1 1) 1)))
+                    (wiredtiger-close db)))
+
+  (with-directory
+   "/tmp/culturia" (receive (db cursors)
+                       (wiredtiger-open "/tmp/culturia"
+                                        '(table ((a . integer) (b . integer)) ((c . integer)) ()))
+                     (test-check "cursor-range 2"
+                                 (let ((cursor (assoc-ref cursors 'table)))
+                                   (cursor-insert* cursor (list 1 1) (list 1))
+                                   (cursor-insert* cursor (list 1 2) (list 1))
+                                   (cursor-insert* cursor (list 2 0) (list 2))
+                                   (cursor-range cursor 1 0))
+                                 '(((1 2) 1)
+                                   ((1 1) 1)))
+                    (wiredtiger-close db)))
+  (with-directory
+   "/tmp/culturia" (receive (db cursors)
+                       (wiredtiger-open "/tmp/culturia"
+                                        '(table ((a . integer) (b . integer)) ((c . integer)) ()))
+                     (test-check "cursor-range 3"
+                                 (let ((cursor (assoc-ref cursors 'table)))
+                                   (cursor-insert* cursor (list 2 0) (list 2))
+                                   (cursor-range cursor 1 0))
+                                 '())
+                     (wiredtiger-close db)))
+  
+  (with-directory
+   "/tmp/culturia" (receive (db cursors)
+                       (wiredtiger-open "/tmp/culturia"
+                                        '(table ((a . integer) (b . integer)) ((c . integer)) ()))
+                     (test-check "cursor-range 3"
+                                 (let ((cursor (assoc-ref cursors 'table)))
+                                   (cursor-insert* cursor (list 0 0) (list 0))
+                                   (cursor-range cursor 1 0))
+                                 '())
+                    (wiredtiger-close db)))
   )
