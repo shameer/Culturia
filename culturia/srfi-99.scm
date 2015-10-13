@@ -3,6 +3,8 @@
 (use-modules (srfi srfi-9))  ;; records
 (use-modules (srfi srfi-9 gnu))  ;; set-record-type-printer! and set-field
 
+;;; FIXME: this is not really srfi-99
+
 ;;;
 ;;; srfi-99
 ;;;
