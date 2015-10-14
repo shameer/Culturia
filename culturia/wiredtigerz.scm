@@ -78,7 +78,13 @@
 ;; The configuration can be used in (session-create* session . configs) to create
 ;; the tables and indices.
 ;;
-
+;; And then in (cursor-open* session . configs) to all the table and indices cursors.
+;;
+;; A <context> record exists which should be associated with a thread. It encapsulates
+;; a <session> and cursors.
+;; A <context> can be created with (context-open connection . config).
+;; Shortcuts exists to execute transaction against a context directly.
+;;
 
 ;; utils for declarative configuration
 
@@ -226,15 +232,59 @@
 ;; Create database and return a connection with its cursors
 ;;
 
-(define (wiredtiger-open path config)
+(define-public (wiredtiger-open path config)
   (let* ((connection (connection-open path "create"))
          (session (session-open connection)))
     (session-create* session config)
     (values (cons connection session) (cursor-open* session config))))
 
 
-(define (wiredtiger-close database)
+(define-public (wiredtiger-close database)
   (connection-close (car database)))
+
+;;;
+;;; <context>
+;;;
+;;
+;; A session and cursors assoc
+;;
+
+(define-record-type* <context> session cursors)
+
+(export context-session context-cursors)
+
+(define-public (context-open connection . configs)
+  (let* ((session (session-open connection))
+         (cursors (apply cursor-open* (cons session configs))))
+    (make-context session cursors)))
+
+
+(define-public (context-ref context name)
+  (assoc-ref (context-cursors context) name))
+
+
+(define-public (context-begin context)
+  (session-transaction-begin (context-session context)))
+
+
+(define-public (context-commit context)
+  (session-transaction-commit (context-session context)))
+
+
+(define-public (context-rollback context)
+  (session-transaction-rollback (context-session context)))
+
+
+(define-syntax-rule (with-transaction context e ...)
+  (begin
+    (context-begin context)
+    e ...
+    (context-commit context)))
+
+
+(export with-transaction)
+                
+                
 
 ;;;
 ;;; Cursor navigation
