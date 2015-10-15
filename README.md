@@ -1,7 +1,9 @@
 # Culturia
 
-Culturia is an [cyc](http://www.cyc.com/) clone and [OpenCog](http://opencog.org/) offspring
-written in [Guile](https://www.gnu.org/software/guile/) powered
+![Babel tower](https://upload.wikimedia.org/wikipedia/commons/thumb/2/27/Tower_of_Babel_cropped_square.jpg/480px-Tower_of_Babel_cropped_square.jpg)
+
+Culturia is an [cyc](http://www.cyc.com/) clone and [OpenCog](http://opencog.org/)
+offspring written in [Guile](https://www.gnu.org/software/guile/) powered
 by [wiredtiger](http://wiredtiger.com/).
 
 This software is free software work licensed under the AfferoGPLv3.
@@ -17,24 +19,37 @@ Done:
 - basic hypergraph cf. HACKING.md 
 - implement zorder packing aka. morton code
 
-Goals:
+Prolly goals:
 
-- z-index
-- trigram index
-- Explore quepy
+- culture aka. database
+  - move to goops
+  - recursive 
+  - vcs
+  - indices
+    - z-index (ongoing)
+    - trigram index
+    - full text index
+  - Natural Language to database query (cf. quepy)
+  - improve srfi 41 to match `gremlin` API
+- NLP
+  - sentence recognizer
+  - lemmatizer
+  - syntax parser
+  - dependency tree
+  - Implement a similar feature as wordvec: `king - man = queen`
+  - Summarization
+    - LexRank
+    - TextRank
+    - TopicRank
+- datasets, create wrappers around <atom>
+  - conceptnet
+  - wikidata
 - Implement chat-80
-- NLP tools
-- full text index
-- Implement recursive culture
-- Implement a blackboard system
-- `gremlin` is actually srfi 41 with a probably some specific stream proc
 - Implement explorer GUI
-- Load conceptnet, wordnet, wikidata
-- Study PageRank like algorithms (SimRank, Personnalized SimRank)
-- Study CoSimRank
-- LexRank & TextRank summarization
-- Study GrammarLink and ReLex
-- Implement a similar feature as wordvec: `king - man = queen`
+- Graph Algorithms 
+  - PageRank, SimRank, Personnalized PageRank
+  - other classic algorithms
+
 
 
 ## Blog
@@ -137,3 +152,8 @@ Also, I'm still wondering what will be the main goal. I thinking about Q/A and
 summarization. Q/A seems more involving. I need to have a look at NLP coursera
 again. Or maybe, I should just code whatever comes to my mind and forget about
 setting any goal...
+
+### 2015/10/14 -
+
+I figured that what I am looking for is personnal assistant so it makes sens to
+implement text mining tools like summarization and information retrieval (IR).
