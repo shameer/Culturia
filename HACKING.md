@@ -1,34 +1,11 @@
-# Reference API
+# HACKING
 
-## `<culturia>`
+At some point code gets documented inline and tested. If something changes, the
+tests can tell. This should serve as a basis to learn how things works even if
+it not optimal. I'm not dealing with same complexity as opencog but I would like
+to avoid writing books (metophorically or not) to explain how it works.
 
-`<culturia>` is a hypergraph database made of `<atom>`. `<atom>` have a type,
-a name, a association, an outgoing set and incomings set of `<atom>`.
+To lower complexity, components are split at the smallest possible parts.
 
-- `(open-culturia path)`
-- `(culturia-close culturia)`
-- `(culturia-begin culturia)`
-- `(culturia-commit culturia)`
-- `(culturia-rollback culturia)`
-- `(with-transaction culturia e ...)`
+Wanna learn? Browse.
 
-## `<atom>`
-
-An `<atom>` is main component of culturia hypergraph database. It's defined as
-an unique identifier `uid`, a scheme association `assoc` and incomings and
-outgoings atoms. `<atom>` are persistent at the scheme level ie. procedure that
-mutates the atom returns new records. That said, mutation is directly propagated
-to the database.
-
-- `(culturia-ref culturia uid)`
-
-- `(create-atom culturia #:optional assoc)`
-- `(atom-uid atom)`
-- `(atom-assoc atom)`
-- `(atom-set atom key value)`
-- `(atom-ref atom key)`
-- `(atom-link atom other)`
-- `(atom-unlink atom other)`
-- `(atom-outgoings atom)`
-- `(atom-incomings atom)`
-- `(atom-delete atom)`
