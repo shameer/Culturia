@@ -14,7 +14,7 @@ The name is a reference to
 
 ## Roadmap
 
-Create a fraemwork that makes it easy to tape into NLP algorithm and provide an
+Create a framework that makes it easy to tape into NLP algorithm and provide an
 interface for common tasks.
 
 Look at `ROADMAP.md` for a detailed version of the roadmap.
