@@ -1,4 +1,4 @@
-;; guile-wiredtiger - 0.1 - 2015/08/06
+;; guile-wiredtiger - 0.2 - 2015/08/06
 
 ;; Copyright © 2014-2015 Amirouche BOUBEKKI <amirouche@hypermove.net>
 
@@ -14,6 +14,12 @@
 
 ;; You should have received a copy of the GNU General Public License
 ;; along with guile-wiredtiger.  If not, see <http://www.gnu.org/licenses/>
+
+;;; Comment: 
+;;
+;; Tested with wiredtiger-2.6.2
+;;
+
 (define-module (wiredtiger))
 
 (use-modules (srfi srfi-9))  ;; records
