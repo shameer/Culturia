@@ -1,4 +1,4 @@
-(define-modules (cli))
+(define-module (cli))
 
 (use-modules (srfi srfi-1))
 (use-modules (srfi srfi-19))  ;; date
@@ -52,7 +52,7 @@
               (acons (keyword->string (car options)) (cadr options) assoc)))))
 
 
-(define (command name help . rest)
+(define-public (command name help . rest)
   (let* ((command (command-parse-args rest (make-command name help (list) #nil #nil (list))))
          (options (command-parse-options (command-options command))))
     (set-field command (command-options) options)))
@@ -75,21 +75,6 @@
       (loop (cdr cmds)))))
 
 
-(define culturia (command "culturia.scm" "Command line to execute primitive tasks"
-                          (command "database" "Manage the database"
-                                   (command "create" "Create database"
-                                            (lambda (argument options)
-                                              (print "* creating database...")))
-                                   (command "delete" "Delete database"
-                                            (lambda (argument options)
-                                              (print "* deleting database..."))))
-                          (command "dataset" "Load dataset"
-                                   (command "conceptnet" "load conceptnet"
-                                            (lambda (argument options)
-                                              (print "* loading conceptnet...")))
-                                   (command "wikidata" "load wikidata"
-                                            (lambda (argument options)
-                                              (print "* loading wikidata..."))))))
 (define (strip-quote string)
   (if (string-prefix? "\"" string)
       (substring string 1 (- (string-length string) 1))
@@ -130,15 +115,8 @@
                         (next name (cdr commands)))))))))
 
 
-(define (program-execute program command)
+(define-public (program-execute program command)
   (receive (command options) (program-arguments-parse program command)
     (if (null? (command-lambda command))
-        (help "culturia.scm" command)
+        (help "" command)
         (apply (command-lambda command) options))))
-
-
-;; (help "" culturia)
-(use-modules (ice-9 receive))
-
-;; (pk culturia)
-(program-execute (program-arguments) culturia)
