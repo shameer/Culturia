@@ -67,7 +67,7 @@
 ;;
 ;; The format can be described as follow:
 ;;
-;; (table name
+;; (table-name
 ;;  (key assoc as (column-name . column-type))
 ;;  (value assoc as (column-name . column-type))
 ;;  (indices as (indexed name (indexed keys) (projection as column names))))
@@ -225,22 +225,25 @@
           (list cursor-name
                 (list (format #false "index:~a:~a(~a)" name (index-name index) columns)))))))
 
+
 ;;;
-;;; database-create
+;;; wiredtiger-create
 ;;;
 ;;
 ;; Create database and return a connection with its cursors
 ;;
 
-(define-public (wiredtiger-open path config)
+
+(define-public (wiredtiger-open path . configs)
   (let* ((connection (connection-open path "create"))
          (session (session-open connection)))
-    (session-create* session config)
-    (values (cons connection session) (cursor-open* session config))))
+    (apply session-create* (append (list session) configs))
+    (values (cons connection session) (apply cursor-open* (append (list session) configs)))))
 
 
 (define-public (wiredtiger-close database)
   (connection-close (car database)))
+
 
 ;;;
 ;;; <context>
@@ -251,7 +254,7 @@
 
 (define-record-type* <context> session cursors)
 
-(export context-session context-cursors)
+(export context-session)
 
 (define-public (context-open connection . configs)
   (let* ((session (session-open connection))
@@ -320,8 +323,7 @@
 
 
 (define-public (cursor-update* cursor key value)
-  (when (not (null? key))
-    (apply cursor-key-set (cons cursor key)))
+  (apply cursor-key-set (cons cursor key))
   (apply cursor-value-set (cons cursor value))
   (cursor-update cursor))
 
