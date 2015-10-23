@@ -32,9 +32,9 @@ Tasks:
 
 ### NLP
   
-- text segmentation
+- [text segmentation](https://en.wikipedia.org/wiki/Text_segmentation)
 - lemmatizer
-- syntax parser
+- syntax parser via Grammar Link
 - dependency tree
 - Implement a similar feature as wordvec: `king - man = queen`
 - Summarization
@@ -50,7 +50,7 @@ Tasks:
 - datasets, create wrappers around <atom>
   - conceptnet
   - wikidata
-
+  - http://www.geonames.org/
 
 ### Graph Algorithms 
 
