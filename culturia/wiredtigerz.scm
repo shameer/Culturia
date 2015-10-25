@@ -12,6 +12,22 @@
 
 (use-modules (wiredtiger))
 
+
+;;; helpers
+
+
+(define-public (scm->string scm)
+  (call-with-output-string
+    (lambda (port)
+      (write scm port))))
+
+
+(define-public (string->scm string)
+  (call-with-input-string string
+    (lambda (port)
+      (read port))))
+                             
+
 ;;;
 ;;; wiredtigerz try to explicit main wiredtiger workflow
 ;;;
