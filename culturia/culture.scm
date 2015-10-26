@@ -120,6 +120,24 @@
     (for-each (lambda (uid) (atom-unlink (make-atom uid #nil) atom context))
               (atom-incomings atom context))))
 
+;;;
+
+(define-public (atom-type+name-index! atom context)
+  (let ((cursor (context-ref context 'type+name))
+        (type (atom-ref atom 'type))
+        (name (atom-ref atom 'name)))
+    (if (and type name)
+        (cursor-insert* cursor (list type name) (list (atom-uid atom)))
+        #false)))
+
+(define-public (atom-type-search type context)
+  (let ((cursor (context-ref context 'type+name)))
+    (map cadr (cursor-range cursor type ""))))
+
+(define-public (atom-type+name-search type name context)
+  (let ((cursor (context-ref context 'type+name)))
+    (map cadr (cursor-range cursor type name))))
+
 
 ;;; trigrams
 
@@ -262,7 +280,38 @@
                                    (atom-outgoings atom context))
                                  (list))
                      (connection-close connection)))
+  
+  ;;; type+name index
 
+  (with-directory
+   "/tmp/culturia" (let* ((connection (connection-open "/tmp/culturia" "create"))
+                          (_ (apply session-create*  (cons (session-open connection) *culture*)))
+                          (context (apply context-open (cons connection *culture*))))
+                     (test-check "type+name search"
+                                 (let* ((atom (create-atom '((type . "type") (name . "name"))))
+                                        (atom (atom-insert! atom context))
+                                        (other (create-atom '((type . "type2") (name . "name2"))))
+                                        (other (atom-insert! other context)))
+                                   (atom-type+name-index! atom context)
+                                   (atom-type+name-index! other context)
+                                   (atom-type+name-search "type" "name" context))
+                                 (list 1))
+                     (connection-close connection)))
+
+
+  (with-directory
+   "/tmp/culturia" (let* ((connection (connection-open "/tmp/culturia" "create"))
+                          (_ (apply session-create*  (cons (session-open connection) *culture*)))
+                          (context (apply context-open (cons connection *culture*))))
+                     (test-check "type search"
+                                 (let* ((atom (create-atom '((type . "type") (name . "name"))))
+                                        (atom (atom-insert! atom context)))
+                                   (atom-type+name-index! atom context)
+                                   (atom-type-search "type" context))
+                                 (list 1))
+                     (connection-close connection)))
+
+  
   ;;; trigrams
 
   (with-directory
