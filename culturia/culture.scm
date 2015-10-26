@@ -1,7 +1,9 @@
 (define-module (culture))
 
+(use-modules (rnrs hashtables))
 
 (use-modules (srfi srfi-1))
+(use-modules (srfi srfi-26))
 
 (use-modules (ice-9 optargs))
 
@@ -119,6 +121,44 @@
               (atom-incomings atom context))))
 
 
+;;; trigrams
+
+(define (word->trigrams word)
+  (define (word->grams word)
+    (let loop ((word word)
+               (grams '()))
+      (if (>= (string-length word) 3)
+          (loop (string-drop word 1) (cons (string-take word 3) grams))
+          ;; do not index grams < 3
+          (reverse grams))))
+  (append-map word->grams (list word (string-take word 1) (string-take word 2))))
+
+
+(define-public (atom-trigrams-index! atom word context)
+  (let ((cursor (context-ref context 'trigrams-append)))
+    (for-each (lambda (trigram) (cursor-insert* cursor #nil (list (atom-uid atom) trigram word)))
+              (word->trigrams word))))
+
+
+(define-public (atom-trigrams-search word context)
+  (define (lookup cursor)
+    (lambda (trigram)
+      (map cdr (cursor-range cursor trigram))))
+
+  (define (count counter)
+    (lambda (tuple)
+      (hashtable-set! counter tuple (+ 1 (hashtable-ref counter tuple 0)))))
+  
+  (let* ((cursor (context-ref context 'trigrams-index))
+         (counter (make-hashtable (cut hash <> 1024) equal?))
+         (results (append-map (lookup cursor) (word->trigrams word))))
+    (for-each (count counter) results)
+    counter))
+
+
+;;;
+;;; tests
+;;;
 
 
 (use-modules (tools))  ;; test-check
@@ -127,6 +167,8 @@
 
 (when (or (getenv "CHECK") (getenv "CHECK_CULTURE"))
 
+  ;;; atoms
+  
   (test-check "atom set"
               (atom-ref (atom-set (create-atom '((a . b))) 'a 'c) 'a)
               'c)
@@ -220,4 +262,41 @@
                                    (atom-outgoings atom context))
                                  (list))
                      (connection-close connection)))
+
+  ;;; trigrams
+
+  (with-directory
+   "/tmp/culturia" (let* ((connection (connection-open "/tmp/culturia" "create"))
+                          (_ (apply session-create*  (cons (session-open connection) *culture*)))
+                          (context (apply context-open (cons connection *culture*))))
+                     (test-check "trigrams search"
+                                 (let* ((atom (atom-insert! (create-atom) context)))
+                                   (atom-trigrams-index! atom "atom" context)
+                                   (hashtable-keys (atom-trigrams-search "atom" context)))
+                                 #((1 "atom")))
+                     (connection-close connection)))
+
+
+  (with-directory
+   "/tmp/culturia" (let* ((connection (connection-open "/tmp/culturia" "create"))
+                          (_ (apply session-create*  (cons (session-open connection) *culture*)))
+                          (context (apply context-open (cons connection *culture*))))
+                     (test-check "trigrams near search"
+                                 (let* ((atom (atom-insert! (create-atom) context)))
+                                   (atom-trigrams-index! atom "atom" context)
+                                   (hashtable-keys (atom-trigrams-search "atomic" context)))
+                                 #((1 "atom")))
+                     (connection-close connection)))
+
+  (with-directory
+   "/tmp/culturia" (let* ((connection (connection-open "/tmp/culturia" "create"))
+                          (_ (apply session-create*  (cons (session-open connection) *culture*)))
+                          (context (apply context-open (cons connection *culture*))))
+                     (test-check "trigrams search no result found"
+                                 (let* ((atom (atom-insert! (create-atom) context)))
+                                   (atom-trigrams-index! atom "atom" context)
+                                   (hashtable-keys (atom-trigrams-search "nothing" context)))
+                                 #())
+                     (connection-close connection)))
+
   )
