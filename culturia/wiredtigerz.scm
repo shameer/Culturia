@@ -8,7 +8,7 @@
 (use-modules (srfi srfi-9 gnu))  ;; set-record-type-printer!
 (use-modules (srfi srfi-26))  ;; cut
 
-(use-modules (srfi-99))
+(use-modules (plain))
 
 (use-modules (wiredtiger))
 
@@ -403,7 +403,7 @@
 (use-modules (ice-9 receive))
 
 
-(when (getenv "CHECK")
+(when (or (getenv "CHECK") (getenv "CHECK_WIREDTIGERZ"))
 
   ;;; test declarative API
 
