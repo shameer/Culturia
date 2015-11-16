@@ -8,10 +8,47 @@
 (use-modules (srfi srfi-9 gnu))  ;; set-record-type-printer!
 (use-modules (srfi srfi-26))  ;; cut
 
-(use-modules (plain))
-
 (use-modules (wiredtiger))
 
+
+;;;
+;;; plain records
+;;;
+;;
+;; macro to quickly define immutable records
+;;
+;;
+;; Usage:
+;;
+;;   (define-record-type <car> seats wheels)
+;;   (define smart (make-abc 2 4))
+;;   (car-seats smart) ;; => 2
+;;
+;; Mutation is not done in place, via set-field or set-fields eg.:
+;;
+;; (define smart-for-4 (set-field smart (seats) 4))
+;; 
+
+(define-syntax define-record-type*
+  (lambda (x)
+    (define (%id-name name) (string->symbol (string-drop (string-drop-right (symbol->string name) 1) 1)))
+    (define (id-name ctx name)
+      (datum->syntax ctx (%id-name (syntax->datum name))))
+    (define (id-append ctx . syms)
+      (datum->syntax ctx (apply symbol-append (map syntax->datum syms))))
+    (syntax-case x ()
+      ((_ rname field ...)
+       (and (identifier? #'rname) (and-map identifier? #'(field ...)))
+       (with-syntax ((cons (id-append #'rname #'make- (id-name #'rname #'rname)))
+                     (pred (id-append #'rname (id-name #'rname #'rname) #'?))
+                     ((getter ...) (map (lambda (f)
+                                          (id-append f (id-name #'rname #'rname) #'- f))
+                                        #'(field ...))))
+         #'(define-record-type rname
+             (cons field ...)
+             pred
+             (field getter)
+             ...))))))
 
 ;;; helpers
 
@@ -297,9 +334,9 @@
 (define-syntax-rule (with-transaction context e ...)
   (begin
     (context-begin context)
-    e ...
-    (context-commit context)))
-
+    (let ((out e ...))
+      (context-commit context)
+      out)))
 
 (export with-transaction)
                 
@@ -395,12 +432,114 @@
 
 
 ;;;
+;;; generate-uid
+;;;
+
+(define-public (generate-uid exists?)
+  "Generate a random string made up alphanumeric ascii chars that doesn't exists
+   according to `exists?`"
+  (define (random-id)
+    (define CHARS "0123456789AZERTYUIOPQSDFGHJKLMWXCVBN")
+    ;; append 8 alphanumeric chars from `CHARS`
+    (let loop ((count 8)
+               (id ""))
+      (if (eq? count 0)
+          id
+          (loop (1- count) (format #f "~a~a" id (string-ref CHARS (random 36)))))))
+
+  (let loop ()
+    ;; generate a random uid until it find an id that doesn't already exists?
+    (let ((id (random-id)))
+      (if (exists? id) (loop) id))))
+
+
+;;;
 ;;; tests
 ;;;
 
-(use-modules (tools))  ;; test-check
-(use-modules (path))  ;; with-directory
 (use-modules (ice-9 receive))
+
+
+(define-public (path-join . rest)
+  "Return the absolute path made of REST. If the first item
+   of REST is not absolute the current working directory
+   will be  prepend"
+  (let ((path (string-join rest "/")))
+    (if (string-prefix? "/" path)
+        path
+        (string-append (getcwd) "/" path))))
+
+
+(define-public (path-dfs-walk dirpath proc)
+  (define dir (opendir dirpath))
+  (let loop ()
+    (let ((entry (readdir dir)))
+      (cond
+       ((eof-object? entry))
+       ((or (equal? entry ".") (equal? entry "..")) (loop))
+       (else (let ((path (path-join dirpath entry)))
+               (if (equal? (stat:type (stat path)) 'directory)
+                   (begin (path-dfs-walk path proc)
+                          (proc path))
+                   (begin (proc path) (loop))))))))
+  (closedir dir)
+  (proc (path-join dirpath)))
+
+
+(define-public (rmtree path)
+  (path-dfs-walk path (lambda (path)
+                        (if (equal? (stat:type (stat path)) 'directory)
+                            (rmdir path)
+                            (delete-file path)))))
+
+
+(define-syntax-rule (with-directory path e ...)
+  (begin
+    (when (access? path F_OK)
+      (rmtree path))
+    (mkdir path)
+    e ...
+    (rmtree path)))
+
+;;;
+;;; print
+;;;
+;;
+;; nicer format
+;;
+;; (print  "Héllo World, " ~s (list "you-name-it"))
+;;
+
+(define-public (print . rest)
+  (let ((template (reverse (cdr (reverse rest))))
+        (parameters (car (reverse rest))))
+    (let loop ((template template)
+               (parameters parameters))
+      (if (null? template)
+          (newline)
+          (if (procedure? (car template))
+              (begin ((car template) (car parameters))
+                     (loop (cdr template) (cdr parameters)))
+              (begin (display (car template))
+                     (loop (cdr template) parameters)))))))
+
+(define-public (~s s) (format #true "~s" s))
+(define-public (~a s) (format #true "~a" s))
+
+;;;
+;;; test-check
+;;;
+
+(define-syntax test-check
+  (syntax-rules ()
+    ((_ title tested-expression expected-result)
+     (begin
+       (print "* Checking " ~s (list title))
+       (let* ((expected expected-result)
+              (produced tested-expression))
+         (if (not (equal? expected produced))
+             (begin (print "Expected: " ~a (list expected))
+                    (print "Computed: " ~a (list produced)))))))))
 
 
 (when (or (getenv "CHECK") (getenv "CHECK_WIREDTIGERZ"))

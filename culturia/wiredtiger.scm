@@ -15,7 +15,7 @@
 ;; You should have received a copy of the GNU General Public License
 ;; along with guile-wiredtiger.  If not, see <http://www.gnu.org/licenses/>
 
-;;; Comment: 
+;;; Comment:
 ;;
 ;; Tested with wiredtiger-2.6.2
 ;;
@@ -223,9 +223,10 @@
   create
   compact
   drop
+  log-flush
   log-printf
-  reset
   rename
+  reset
   salvage
   truncate
   upgrade
@@ -263,7 +264,7 @@
             ;; FIXME: add support for error_handler
             (code (foreign-function (connection-handle connection) *NULL* %config double-pointer)))
        (if (eq? code 0)
-           (make make-session make-session-structure pointer 23)
+           (make make-session make-session-structure pointer 24)
            (let ((message (format #false "(session-open ~s ~s)" connection config)))
              (wiredtiger-string-error message code)))))))
 
@@ -422,7 +423,7 @@
 
 (define *item->value* `((#\S . ,item->string)
                         (#\Q . ,item->integer)
-                        (#\q . ,item->integer)                        
+                        (#\q . ,item->integer)
                         (#\r . ,item->integer)))
 
 (define (pointers->scm formats pointers)
@@ -473,7 +474,7 @@
 
 (define *format->pointer* `((#\S . ,make-string-pointer)
                             (#\Q . ,make-pointer)
-                            (#\q . ,make-pointer)                            
+                            (#\q . ,make-pointer)
                             (#\r . ,make-pointer)))
 
 (define (formats->items formats values)
