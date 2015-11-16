@@ -31,7 +31,7 @@
 
 (use-modules (wiredtiger))
 (use-modules (wiredtigerz))
-(use-modules (culture))
+(use-modules (uav))
 
 ;;;
 ;;; Guile helpers
@@ -42,10 +42,8 @@
   (match query (value e ...)))
 
 
-(define connection (connection-open "db/" "create"))
-(define session (session-open connection))
-(apply session-create* (cons session *culture*))
-(define context (apply context-open (cons connection *culture*)))
+(define connection (uav-open "db"))
+(define context (uav-context-open connection))
 
 (define iterator 0)
 (define step 1)
@@ -58,9 +56,10 @@
 
 
 (define (add entry)
-  (atom-insert! (create-atom entry) context))
+  (with-transaction context
+    (uav-add! context entry)))
 
-(define path "/media/amirouche/data/data/data/assertions/part_0")
+(define path "data/conceptnet/part_0")
 
 (let next-file ((index 0))
   (let* ((filename (pk (string-append path (number->string index) ".msgpack")))
