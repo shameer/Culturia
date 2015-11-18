@@ -12,7 +12,7 @@
 (define-public (path-join . rest)
   "Return the absolute path made of REST. If the first item
    of REST is not absolute the current working directory
-   will be  prepend"
+   will be prepended"
   (let ((path (string-join rest "/")))
     (if (string-prefix? "/" path)
         path
