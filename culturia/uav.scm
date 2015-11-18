@@ -43,15 +43,11 @@
         (string->scm (car value)))))
 
 
-(define (assocify range)
-  (map (match-lambda (((uid attribute) . (value))
-                      (cons (string->scm attribute) (string->scm value))))
-       range))
-
-
 (define-public (uav-ref* context uid)
   (let ((cursor (context-ref context 'tuples)))
-    (assocify (cursor-range cursor uid ""))))
+  (map (match-lambda (((uid attribute) . (value)) 
+                      (cons (string->scm attribute) (string->scm value))))
+       (cursor-range cursor uid ""))))
 
 
 (define (make-uid context)
@@ -68,8 +64,7 @@
 
 
 (define-public (uav-del! context uid)
-  (define cursor (context-ref context 'tuples))
-  (for-each (match-lambda ((attribute . value) (cursor-remove* cursor uid (scm->string attribute))))
+  (for-each (match-lambda ((attribute . value) (cursor-remove* (context-ref context 'tuples) uid (scm->string attribute))))
             (uav-ref* context uid)))
 
 
