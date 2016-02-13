@@ -1,3 +1,24 @@
+;; guile-wiredtiger - 0.2 - 2015/10/22
+
+;; Copyright © 2014-2015 Amirouche BOUBEKKI <amirouche@hypermove.net>
+
+;; guile-wiredtiger is free software: you can redistribute it and/or modify
+;; it under the terms of the GNU General Public License as published by
+;; the Free Software Foundation, either version 2 of the License, or
+;; (at your option) or version 3.
+
+;; guile-wiredtiger is distributed in the hope that it will be useful,
+;; but WITHOUT ANY WARRANTY; without even the implied warranty of
+;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+;; GNU General Public License for more details.
+
+;; You should have received a copy of the GNU General Public License
+;; along with guile-wiredtiger.  If not, see <http://www.gnu.org/licenses/>
+
+;;; Comment:
+;;
+;; Tested with wiredtiger-2.6.1
+;;
 (define-module (wiredtigerz))
 
 (use-modules (ice-9 match))
@@ -27,7 +48,7 @@
 ;; Mutation is not done in place, via set-field or set-fields eg.:
 ;;
 ;; (define smart-for-4 (set-field smart (seats) 4))
-;; 
+;;
 
 (define-syntax define-record-type*
   (lambda (x)
@@ -63,7 +84,7 @@
   (call-with-input-string string
     (lambda (port)
       (read port))))
-                             
+
 
 ;;;
 ;;; wiredtigerz try to explicit main wiredtiger workflow
@@ -334,13 +355,13 @@
 (define-syntax-rule (with-transaction context e ...)
   (begin
     (context-begin context)
-    (let ((out e ...))
+    (let ((out (begin e ...)))
       (context-commit context)
       out)))
 
 (export with-transaction)
-                
-                
+
+
 
 ;;;
 ;;; Cursor navigation
@@ -396,8 +417,7 @@
   (apply cursor-key-set (cons cursor key-prefix))
   (let ((code (cursor-search-near cursor)))
     (cond
-     ;; position the cursor at the first key
-     ((eq? code -1) (if (cursor-next cursor) #true #false))
+     ((or (eq? code -1) (eq? code 4294967295)) (if (cursor-next cursor) #true #false))
      ;; not found
      ((eq? code #false) #false)
      ;; 0 the correct position or 1 which means above and should be filtered
@@ -647,7 +667,7 @@
                                    (cursor-range cursor 1 0))
                                  '())
                      (wiredtiger-close db)))
-  
+
   (with-directory
    "/tmp/culturia" (receive (db cursors)
                        (wiredtiger-open "/tmp/culturia"

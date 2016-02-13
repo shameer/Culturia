@@ -17,7 +17,7 @@
 
 ;;; Comment:
 ;;
-;; Tested with wiredtiger-2.6.2
+;; Tested with wiredtiger-2.6.1
 ;;
 
 (define-module (wiredtiger))
@@ -223,10 +223,8 @@
   create
   compact
   drop
-  log-flush
   log-printf
   rename
-  reset
   salvage
   truncate
   upgrade
@@ -264,7 +262,7 @@
             ;; FIXME: add support for error_handler
             (code (foreign-function (connection-handle connection) *NULL* %config double-pointer)))
        (if (eq? code 0)
-           (make make-session make-session-structure pointer 24)
+           (make make-session make-session-structure pointer 22)
            (let ((message (format #false "(session-open ~s ~s)" connection config)))
              (wiredtiger-string-error message code)))))))
 
