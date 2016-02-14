@@ -99,4 +99,4 @@ Fuzzy index scheme `VALUE` as `WORD` inside the database referenced by
 
 Fuzzy search `WORD` inside the database referenced by `CONTEXT`.
 
-Returns an ordered list of scheme values.
+Returns top 10 results according to levenstein distance.
