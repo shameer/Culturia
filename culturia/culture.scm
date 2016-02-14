@@ -27,28 +27,25 @@
                          (incomings (end) (start)))))
 
 
-(define *type+name* '(type+name ((type . string)
-                                 (name . string))
-                                ((uid . unsigned-integer))
-                                ()))
-
+(define *index* '(index ((key . string))
+                        ((value . string))
+                        ()))
 
 (define *trigrams* '(trigrams ((key . record))
-                              ((uid . unsigned-integer)
-                               (trigram . string)
-                               (word . string))
-                              ((index (trigram) (uid word))
-                               (reverse (uid) (key)))))
+                              ((value . string)
+                               (trigram . string))
+                              ((index (trigram) (value))
+                               (value (value) (key)))))
 
 
-(define-public *culture* (list *atoms* *links* *type+name* *trigrams*))
+(define-public *culture* (list *atoms* *links* *index* *trigrams*))
 
 
+;;;
 ;;; <atom> procedures
-
+;;;
 
 (define-record-type* <atom> uid assoc)
-
 
 (export atom-uid atom-assoc)
 
@@ -67,7 +64,7 @@
 (define-public (atom-ref atom key)
   (assoc-ref (atom-assoc atom) key))
 
-         
+
 (define-public (atom-insert! atom context)
   (let ((cursor (context-ref context 'atoms-append)))
     (cursor-insert* cursor
@@ -121,25 +118,31 @@
               (atom-incomings atom context))))
 
 ;;;
+;;; *index*
+;;;
 
-(define-public (atom-type+name-index! atom context)
-  (let ((cursor (context-ref context 'type+name))
-        (type (atom-ref atom 'type))
-        (name (atom-ref atom 'name)))
-    (if (and type name)
-        (cursor-insert* cursor (list type name) (list (atom-uid atom)))
-        #false)))
+(define-public (index-set! key value context)
+  (let ((cursor (context-ref context 'index)))
+    (cursor-insert* cursor (list key) (list (scm->string value)))))
 
-(define-public (atom-type-search type context)
-  (let ((cursor (context-ref context 'type+name)))
-    (map cadr (cursor-range cursor type ""))))
+(define-public (index-ref key context)
+  (let ((cursor (context-ref context 'index)))
+    (if (cursor-search* cursor key)
+        (string->scm (car (cursor-value-ref cursor)))
+        #nil)))
 
-(define-public (atom-type+name-search type name context)
-  (let ((cursor (context-ref context 'type+name)))
-    (map cadr (cursor-range cursor type name))))
+;;
+;; XXX: it's possible to have multiple row with the same value so this
+;;      procedure is not enough to remove a value from the index
+;;
+;; (define-public (index-remove! value context)
+;;   (let ((cursor (context-ref context 'index-value))
+;;         (key (car (cursor-search* cursor (scm->string value)))))
+;;     (let ((cursor (contex-ref context 'index)))
+;;       (cursor-remove* cursor key))))
+;;
 
-
-;;; trigrams
+;;; fuzzy index
 
 (define (word->trigrams word)
   (define (word->grams word)
@@ -152,26 +155,42 @@
   (append-map word->grams (list word (string-take word 1) (string-take word 2))))
 
 
-(define-public (atom-trigrams-index! atom word context)
+(define-public (fuzzy-index! word value context)
+  (define (trigrams-index! value cursor)
+    (let ((value (scm->string value)))
+      (lambda (trigram)
+        (cursor-insert* cursor #nil (list value trigram)))))
+
   (let ((cursor (context-ref context 'trigrams-append)))
-    (for-each (lambda (trigram) (cursor-insert* cursor #nil (list (atom-uid atom) trigram word)))
-              (word->trigrams word))))
+    (for-each (trigrams-index! value cursor) (word->trigrams word))))
 
 
-(define-public (atom-trigrams-search word context)
+(define-public (fuzzy-search word context)
   (define (lookup cursor)
     (lambda (trigram)
-      (map cdr (cursor-range cursor trigram))))
+      (append-map cdr (cursor-range cursor trigram))))
 
   (define (count counter)
     (lambda (tuple)
       (hashtable-set! counter tuple (+ 1 (hashtable-ref counter tuple 0)))))
-  
-  (let* ((cursor (context-ref context 'trigrams-index))
-         (counter (make-hashtable (cut hash <> 1024) equal?))
-         (results (append-map (lookup cursor) (word->trigrams word))))
-    (for-each (count counter) results)
-    counter))
+
+  (define (search word)
+    (let* ((cursor (context-ref context 'trigrams-index))
+           (counter (make-hashtable (cut hash <> 1024) equal?))
+           (results (append-map (lookup cursor) (word->trigrams word))))
+      (for-each (count counter) results)
+      counter))
+
+  (define (counter->ordered-list counter)
+    (define (less a b)
+      (> (hashtable-ref counter a 0) (hashtable-ref counter b 0)))
+
+    (let ((words (hashtable-keys counter)))
+      (sort words less)))
+
+  (define search* (compose vector->list counter->ordered-list search))
+  (map string->scm (search* word)))
+
 
 
 ;;;
@@ -186,7 +205,7 @@
 (when (or (getenv "CHECK") (getenv "CHECK_CULTURE"))
 
   ;;; atoms
-  
+
   (test-check "atom set"
               (atom-ref (atom-set (create-atom '((a . b))) 'a 'c) 'a)
               'c)
@@ -280,72 +299,46 @@
                                    (atom-outgoings atom context))
                                  (list))
                      (connection-close connection)))
-  
-  ;;; type+name index
+
+
+  ;;; index
 
   (with-directory
    "/tmp/culturia" (let* ((connection (connection-open "/tmp/culturia" "create"))
                           (_ (apply session-create*  (cons (session-open connection) *culture*)))
                           (context (apply context-open (cons connection *culture*))))
-                     (test-check "type+name search"
-                                 (let* ((atom (create-atom '((type . "type") (name . "name"))))
-                                        (atom (atom-insert! atom context))
-                                        (other (create-atom '((type . "type2") (name . "name2"))))
-                                        (other (atom-insert! other context)))
-                                   (atom-type+name-index! atom context)
-                                   (atom-type+name-index! other context)
-                                   (atom-type+name-search "type" "name" context))
-                                 (list 1))
+                     (test-check "index-set! and index-ref"
+                                 (begin (index-set! "key" "value" context)
+                                        (index-ref "key" context))
+                                 "value")
                      (connection-close connection)))
-
 
   (with-directory
    "/tmp/culturia" (let* ((connection (connection-open "/tmp/culturia" "create"))
                           (_ (apply session-create*  (cons (session-open connection) *culture*)))
                           (context (apply context-open (cons connection *culture*))))
-                     (test-check "type search"
-                                 (let* ((atom (create-atom '((type . "type") (name . "name"))))
-                                        (atom (atom-insert! atom context)))
-                                   (atom-type+name-index! atom context)
-                                   (atom-type-search "type" context))
-                                 (list 1))
+                     (test-check "index-ref finds nothing"
+                                 (index-ref "key" context)
+                                 #nil)
                      (connection-close connection)))
 
-  
   ;;; trigrams
-
-  (with-directory
-   "/tmp/culturia" (let* ((connection (connection-open "/tmp/culturia" "create"))
-                          (_ (apply session-create*  (cons (session-open connection) *culture*)))
-                          (context (apply context-open (cons connection *culture*))))
-                     (test-check "trigrams search"
-                                 (let* ((atom (atom-insert! (create-atom) context)))
-                                   (atom-trigrams-index! atom "atom" context)
-                                   (hashtable-keys (atom-trigrams-search "atom" context)))
-                                 #((1 "atom")))
-                     (connection-close connection)))
+  (test-check "word->trigrams"
+              (word->trigrams "abcdef")
+              '("abc" "bcd" "cde" "def"))
 
 
   (with-directory
    "/tmp/culturia" (let* ((connection (connection-open "/tmp/culturia" "create"))
                           (_ (apply session-create*  (cons (session-open connection) *culture*)))
                           (context (apply context-open (cons connection *culture*))))
-                     (test-check "trigrams near search"
-                                 (let* ((atom (atom-insert! (create-atom) context)))
-                                   (atom-trigrams-index! atom "atom" context)
-                                   (hashtable-keys (atom-trigrams-search "atomic" context)))
-                                 #((1 "atom")))
-                     (connection-close connection)))
+                     (test-check "fuzzy index"
+                                 (begin (fuzzy-index! "fuzzy" "another" context)
+                                        (fuzzy-index! "fuzz" "other" context)
+                                        (fuzzy-index! "fuzzy apple fuzz" "first" context)
+                                        (fuzzy-index! "fuz" "last" context)
 
-  (with-directory
-   "/tmp/culturia" (let* ((connection (connection-open "/tmp/culturia" "create"))
-                          (_ (apply session-create*  (cons (session-open connection) *culture*)))
-                          (context (apply context-open (cons connection *culture*))))
-                     (test-check "trigrams search no result found"
-                                 (let* ((atom (atom-insert! (create-atom) context)))
-                                   (atom-trigrams-index! atom "atom" context)
-                                   (hashtable-keys (atom-trigrams-search "nothing" context)))
-                                 #())
+                                        (fuzzy-search "fuzz" context))
+                                 '("first" "another" "other" "last"))
                      (connection-close connection)))
-
   )
