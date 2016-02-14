@@ -102,19 +102,19 @@
     (map cadr (cursor-range cursor (atom-uid atom)))))
 
 
-(define-public (atom-unlink atom other context)
+(define-public (atom-unlink! atom other context)
   (let ((cursor (context-ref context 'links)))
     (cursor-remove* cursor (atom-uid atom) (atom-uid other))))
 
 
-(define-public (atom-delete! atom context)
+(define-public (atom-remove! atom context)
   (let ((cursor (context-ref context 'atoms-append)))
     ;; remove assoc
     (cursor-remove* cursor (atom-uid atom))
     ;; remove links
-    (for-each (lambda (uid) (atom-unlink atom (make-atom uid #nil) context))
+    (for-each (lambda (uid) (atom-unlink! atom (make-atom uid #nil) context))
               (atom-outgoings atom context))
-    (for-each (lambda (uid) (atom-unlink (make-atom uid #nil) atom context))
+    (for-each (lambda (uid) (atom-unlink! (make-atom uid #nil) atom context))
               (atom-incomings atom context))))
 
 ;;;
@@ -295,7 +295,7 @@
                                  (let* ((atom (atom-insert! (create-atom) context))
                                         (other (atom-insert! (create-atom) context)))
                                    (atom-link! atom other context)
-                                   (atom-delete! other context)
+                                   (atom-remove! other context)
                                    (atom-outgoings atom context))
                                  (list))
                      (connection-close connection)))
@@ -333,12 +333,11 @@
                           (_ (apply session-create*  (cons (session-open connection) *culture*)))
                           (context (apply context-open (cons connection *culture*))))
                      (test-check "fuzzy index"
-                                 (begin (fuzzy-index! "fuzzy" "another" context)
-                                        (fuzzy-index! "fuzz" "other" context)
-                                        (fuzzy-index! "fuzzy apple fuzz" "first" context)
-                                        (fuzzy-index! "fuz" "last" context)
+                                 (begin (fuzzy-index! "fuzz" "another" context)
+                                        (fuzzy-index! "fuzzing" "other" context)
+                                        (fuzzy-index! "fuzzy" "first" context)
 
-                                        (fuzzy-search "fuzz" context))
-                                 '("first" "another" "other" "last"))
+                                        (fuzzy-search "fuzzy" context))
+                                 '("first" "another" "other"))
                      (connection-close connection)))
   )
