@@ -23,7 +23,7 @@
                      (loop (cdr template) parameters)))))))
 
 (define-public (~s s) (format #true "~s" s))
-(define-public (~a s) (format #true "~a" s))
+(define-public (~a s) (format #true "~s" s))
 
 ;;;
 ;;; test-check
@@ -37,8 +37,8 @@
        (let* ((expected expected-result)
               (produced tested-expression))
          (if (not (equal? expected produced))
-             (begin (print "Expected: " ~a (list expected))
-                    (print "Computed: " ~a (list produced)))))))))
+             (begin (print "Expected: " ~s (list expected))
+                    (print "Computed: " ~s (list produced)))))))))
 
 (export test-check)
 
