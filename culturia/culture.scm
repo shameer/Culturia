@@ -361,11 +361,11 @@
                           (_ (apply session-create*  (cons (session-open connection) *culture*)))
                           (context (apply context-open (cons connection *culture*))))
                      (test-check "fuzzy index"
-                                 (begin (fuzzy-index! "fuzz" "another" context)
-                                        (fuzzy-index! "fuzzing" "other" context)
+                                 (begin (fuzzy-index! "fuzzyng" "second" context)
+                                        (fuzzy-index! "fuzzing" "last" context)
                                         (fuzzy-index! "fuzzy" "first" context)
 
                                         (fuzzy-search "fuzzy" context))
-                                 '("first" "another" "other"))
+                                 '("first" "second" "last"))
                      (connection-close connection)))
   )
