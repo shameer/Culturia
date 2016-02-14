@@ -32,9 +32,10 @@
                         ()))
 
 (define *trigrams* '(trigrams ((key . record))
-                              ((value . string)
-                               (trigram . string))
-                              ((index (trigram) (value))
+                              ((word . string)
+                               (trigram . string)
+                               (value . string))
+                              ((index (trigram) (word value))
                                (value (value) (key)))))
 
 
@@ -155,20 +156,35 @@
   (append-map word->grams (list word (string-take word 1) (string-take word 2))))
 
 
+(define (levenshtein s t)
+  (define (%levenshtein s sl t tl)
+    (cond ((zero? sl) tl)
+          ((zero? tl) sl)
+          (else
+	    (min (+ (%levenshtein (cdr s) (- sl 1) t tl) 1)
+                 (+ (%levenshtein s sl (cdr t) (- tl 1)) 1)
+                 (+ (%levenshtein (cdr s) (- sl 1) (cdr t) (- tl 1))
+		    (if (char=? (car s) (car t)) 0 1))))))
+  (%levenshtein (string->list s)
+		(string-length s)		
+		(string->list t)
+		(string-length t)))
+
+
 (define-public (fuzzy-index! word value context)
-  (define (trigrams-index! value cursor)
+  (define (index! word value cursor)
     (let ((value (scm->string value)))
       (lambda (trigram)
-        (cursor-insert* cursor #nil (list value trigram)))))
+        (cursor-insert* cursor #nil (list word trigram value)))))
 
   (let ((cursor (context-ref context 'trigrams-append)))
-    (for-each (trigrams-index! value cursor) (word->trigrams word))))
+    (for-each (index! word value cursor) (word->trigrams word))))
 
 
 (define-public (fuzzy-search word context)
   (define (lookup cursor)
     (lambda (trigram)
-      (append-map cdr (cursor-range cursor trigram))))
+      ( map cdr (cursor-range cursor trigram))))
 
   (define (count counter)
     (lambda (tuple)
@@ -189,7 +205,19 @@
       (sort words less)))
 
   (define search* (compose vector->list counter->ordered-list search))
-  (map string->scm (search* word)))
+
+  (define (list-head* lst size)
+    (if (< (length lst) size)
+        lst
+        (list-head lst size)))
+  
+  ;; (search* word))
+  (define (less a b)
+    (< (levenshtein (car a) word)
+       (levenshtein (car b) word)))
+  
+  (let ((top (list-head* (search* word) 10)))
+    (map (compose string->scm cadr) (sort top less))))
 
 
 
