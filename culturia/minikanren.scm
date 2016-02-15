@@ -1,9 +1,38 @@
-;; Jason Hemann and Dan Friedman
-;; microKanren, final implementation from paper
+;;   miniKanren
+;;
+;; Implementation based on microKanren compatible with GNU Guile
+;;
+;; Forked from https://github.com/amirouche/microKanren
+;;
+;; Copyright (C) 2013 Jason Hemann and Daniel P. Friedman
+;; Copyright (C) 2015 Amirouche Boubekki
+;;
+;; Permission is hereby granted, free of charge, to any person
+;; obtaining a copy of this software and associated documentation
+;; files (the "Software"), to deal in the Software without
+;; restriction, including without limitation the rights to use, copy,
+;; modify, merge, publish, distribute, sublicense, and/or sell copies
+;; of the Software, and to permit persons to whom the Software is
+;; furnished to do so, subject to the following conditions:
+;;
+;; The above copyright notice and this permission notice shall be
+;; included in all copies or substantial portions of the Software.
+;;
+;; THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+;; EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+;; MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+;; NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS
+;; BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
+;; ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+;; CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+;; SOFTWARE.
+;;
+(define-module (minikanren))
 
-(define (var c) (vector c))
-(define (var? x) (vector? x))
-(define (var=? x1 x2) (= (vector-ref x1 0) (vector-ref x2 0)))
+
+(define-public (var c) (vector c))
+(define-public (var? x) (vector? x))
+(define-public var=? equal?)
 
 
 (define (assp proc alist)
@@ -16,28 +45,28 @@
             (next (cdr alist))))))
 
 
-(define (walk u s)
-  "Find U in substitutions S"
+(define-public (walk u s)
+  "Find U substitution in S"
   (let ((pr (and (var? u) (assp (lambda (v) (var=? u v)) s))))
     (if pr (walk (cdr pr) s) u)))
 
 
 ;; (acons x v substitutions)
-;; ie. add (x . y) to the list of substituations
+;; ie. add `v substitue x` to the list of substituations
 (define ext-s acons)
 
 
-(define (== u v)
+(define-public (== u v)
   (lambda (s/c)
     (let ((s (unify u v (car s/c))))
       (if s (unit (cons s (cdr s/c))) mzero))))
 
 
-(define (unit s/c) (cons s/c mzero))
-(define mzero '())
+(define-public (unit s/c) (cons s/c mzero))
+(define-public mzero '())
 
 
-(define (unify u v s)
+(define-public (unify u v s)
   ;; resolve U and V according to substitution S
   (let ((u (walk u s)) (v (walk v s)))
     ;; unify if possible
@@ -53,7 +82,7 @@
       (let ((s (unify (car u) (car v) s)))
         (and s (unify (cdr u) (cdr v) s))))
      ;; otherwise, substitutions is ok, if U and V are EQV?
-     (else (and (eqv? u v) s)))))
+     (else (and (equal? u v) s)))))
 
 
 (define (call/fresh f)
@@ -62,8 +91,8 @@
       ((f (var c)) (cons (car s/c) (+ c 1))))))
 
 
-(define (disj g1 g2) (lambda (s/c) (mplus (g1 s/c) (g2 s/c))))
-(define (conj g1 g2) (lambda (s/c) (bind (g1 s/c) g2)))
+(define-public (disj g1 g2) (lambda (s/c) (mplus (g1 s/c) (g2 s/c))))
+(define-public (conj g1 g2) (lambda (s/c) (bind (g1 s/c) g2)))
 
 (define (mplus $1 $2)
   (cond
@@ -78,7 +107,7 @@
    (else (mplus (g (car $)) (bind (cdr $) g)))))
 
 
-;;;; How to make a simple
+;;;; How to make a simple minikanren
 
 (define-syntax Zzz
   (syntax-rules ()
@@ -89,10 +118,14 @@
     ((_ g) (Zzz g))
     ((_ g0 g ...) (conj (Zzz g0) (conj+ g ...)))))
 
+(export conj+)
+
 (define-syntax disj+
   (syntax-rules ()
     ((_ g) (Zzz g))
     ((_ g0 g ...) (disj (Zzz g0) (disj+ g ...)))))
+
+(export disj+)
 
 (define-syntax fresh
   (syntax-rules ()
@@ -102,19 +135,28 @@
       (lambda (x0)
         (fresh (x ...) g0 g ...))))))
 
+(export fresh)
+
 (define-syntax conde
   (syntax-rules ()
     ((_ (g0 g ...) ...) (disj+ (conj+ g0 g ...) ...))))
 
-(define-syntax run
-  (syntax-rules ()
-    ((_ n (x ...) g0 g ...)
-     (map reify-1st (take n (call/goal (fresh (x ...) g0 g ...)))))))
+(export conde)
+
+;; (define-syntax run
+;;   (syntax-rules ()
+;;     ((_ n (x ...) g0 g ...)
+;;      (map reify-1st (take n (call/goal (fresh (x ...) g0 g ...)))))))
+
+;; (export run)
+
 
 (define-syntax run*
   (syntax-rules ()
     ((_ (x ...) g0 g ...)
      (map reify-1st (take-all (call/goal (fresh (x ...) g0 g ...)))))))
+
+(export run*)
 
 (define empty-state '(() . 0))
 
@@ -134,6 +176,10 @@
 
 (define (reify-1st s/c)
   (let ((v (walk* (var 0) (car s/c))))
+    (walk* v (reify-s v '()))))
+
+(define (reify v s/c)
+  (let ((v (walk* v (car s/c))))
     (walk* v (reify-s v '()))))
 
 (define (walk* v s)
@@ -168,7 +214,36 @@
                     (app-f/v* (- n 1) (cons x v*)))))))))
     (app-f/v* n '())))
 
-;;; Test programs
+;;;
+
+;; (define (appendo l s out)
+;;   (conde
+;;    ((== '() l) (== s out))
+;;    ((fresh (a d res)
+;;            (== `(,a . ,d) l)
+;;            (== `(,a . ,res) out)
+;;            (appendo d s res)))))
+
+(define (run goal . vars)
+  (take-all
+   (call/goal (apply goal vars))))
+
+(use-modules (srfi srfi-1))
+(use-modules (srfi srfi-26))
+
+(define-public (reify-all goal . names)
+  (let* ((vars (map var names))
+         (s/c (apply run (cons goal vars))))
+    (map (lambda (s) (map (cut reify <> s) vars)) s/c)))
+
+;; (pk (reify-all (lambda (a? b?)
+;;                  (conj+ (== a? 1)
+;;                         (== b? 2)))
+;;                'a? 'b?))
+
+;;;
+;;; Tests
+;;;
 
 ;; (define (printf message . rest)
 ;;   (apply format (append (list #false message) rest)))
@@ -187,60 +262,6 @@
 ;;              (errorf 'test-check
 ;;                      "Failed: ~a~%Expected: ~a~%Computed: ~a~%"
 ;;                      'tested-expression expected produced)))))))
-
-;; (define (appendo l s out)
-;;   (conde
-;;    ((== '() l) (== s out))
-;;    ((fresh (a d res)
-;;            (== `(,a . ,d) l)
-;;            (== `(,a . ,res) out)
-;;            (appendo d s res)))))
-
-
-;; (define (!= u v)
-;;   (lambda (s/c)
-;;     (let ((s (unify u v (car s/c))))
-;;       (if s mzero (unit s/c)))))
-
-
-;; (define tuplespace '((1 name amirouche)
-;;                      (1 age 30)
-;;                      (2 name Nadoo)
-;;                      (2 age 57)
-;;                      (3 label friend)
-;;                      (3 start 1)
-;;                      (3 end 2)
-;;                      (4 name Karamel)
-;;                      (4 age 27)
-;;                      (5 label friend)
-;;                      (5 start 1)
-;;                      (5 end 4)))
-
-
-;; (define (attro db)
-;;   (lambda (uid label value)
-;;     (conde
-;;      ((!= db '()) (== (list uid label value) (car db)))
-;;      ((!= db '()) ((attro (cdr db)) uid label value)))))
-
-
-;; (define (findo db)
-;;   (lambda (attribute value out)
-;;     (conde
-;;      ((!= db '()) (== (cdar db) (list attribute value)) (== out (caar db)))
-;;      ((!= db '()) ((findo (cdr db)) attribute value out)))))
-
-
-;; (define (friendo db)
-;;   (lambda (name out)
-;;     (fresh (edge uid)
-;;            ((findo db) 'name name uid)
-;;            ((findo db) 'label 'friend edge)
-;;            ((attro db) edge 'start uid)
-;;            ((attro db) edge 'end out))))
-
-;; (pk (run* (q) ((friendo tuplespace) 'amirouche q)))
-
 
 ;; (test-check 'run*
 ;;   (run* (q) (fresh (x y) (== `(,x ,y) q) (appendo x y '(1 2 3 4 5))))
@@ -316,8 +337,3 @@
 ;;       (1 (2 8 3 4) 5 8 8 8)
 ;;       (1 (2 8 3 4) 5 8 8 8 8)
 ;;       (1 (2 8 3 4) 5 8 8 8 8 8)))
-
-
-
-
-
