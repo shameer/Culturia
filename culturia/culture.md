@@ -54,7 +54,7 @@ referenced by `CONTEXT`.
 
 #### `(atom-link! atom other context)`
 
-Create a direct link between `ATOM` and `OTHER` inside the database
+Create a directed link between `ATOM` and `OTHER` inside the database
 referenced by `CONTEXT`
 
 #### `(atom-incomings atom context)`
