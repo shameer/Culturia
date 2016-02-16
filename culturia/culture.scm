@@ -229,7 +229,6 @@
 (use-modules (tools))  ;; test-check
 (use-modules (path))  ;; with-directory
 
-
 (when (or (getenv "CHECK") (getenv "CHECK_CULTURE"))
 
   ;;; atoms
