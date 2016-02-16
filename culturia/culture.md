@@ -27,7 +27,7 @@ Return the unique identifier of `ATOM`.
 
 Return the assoc of `ATOM`.
 
-#### `(create-atom atom #:optional (assoc '()))`
+#### `(create-atom #:optional (assoc '()))`
 
 Create an `<atom>` with `ASSOC`.
 
@@ -54,7 +54,7 @@ referenced by `CONTEXT`.
 
 #### `(atom-link! atom other context)`
 
-Create a directect link between `ATOM` and `OTHER` inside the database
+Create a direct link between `ATOM` and `OTHER` inside the database
 referenced by `CONTEXT`
 
 #### `(atom-incomings atom context)`
