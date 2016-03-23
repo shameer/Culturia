@@ -55,16 +55,13 @@
 ;; ie. add `v substitue x` to the list of substituations
 (define ext-s acons)
 
+(define-public mzero '())
+(define-public (unit s/c) (cons s/c mzero))
 
 (define-public (== u v)
   (lambda (s/c)
     (let ((s (unify u v (car s/c))))
       (if s (unit (cons s (cdr s/c))) mzero))))
-
-
-(define-public (unit s/c) (cons s/c mzero))
-(define-public mzero '())
-
 
 (define-public (unify u v s)
   ;; resolve U and V according to substitution S
@@ -85,26 +82,23 @@
      (else (and (equal? u v) s)))))
 
 
-(define (call/fresh f)
-  (lambda (s/c)
-    (let ((c (cdr s/c)))
-      ((f (var c)) (cons (car s/c) (+ c 1))))))
-
-
-(define-public (disj g1 g2) (lambda (s/c) (mplus (g1 s/c) (g2 s/c))))
-(define-public (conj g1 g2) (lambda (s/c) (bind (g1 s/c) g2)))
-
 (define (mplus $1 $2)
   (cond
    ((null? $1) $2)
    ((procedure? $1) (lambda () (mplus $2 ($1))))
    (else (cons (car $1) (mplus (cdr $1) $2)))))
 
+
 (define (bind $ g)
   (cond
    ((null? $) mzero)
    ((procedure? $) (lambda () (bind ($) g)))
    (else (mplus (g (car $)) (bind (cdr $) g)))))
+
+
+(define-public (disj g1 g2) (lambda (s/c) (mplus (g1 s/c) (g2 s/c))))
+(define-public (conj g1 g2) (lambda (s/c) (bind (g1 s/c) g2)))
+
 
 
 ;;;; How to make a simple minikanren
@@ -126,6 +120,11 @@
     ((_ g0 g ...) (disj (Zzz g0) (disj+ g ...)))))
 
 (export disj+)
+
+(define (call/fresh f)
+  (lambda (s/c)
+    (let ((c (cdr s/c)))
+      ((f (var c)) (cons (car s/c) (+ c 1))))))
 
 (define-syntax fresh
   (syntax-rules ()
@@ -174,14 +173,6 @@
       (let (($ (pull $)))
         (if (null? $) '() (cons (car $) (take (- n 1) (cdr $)))))))
 
-(define (reify-1st s/c)
-  (let ((v (walk* (var 0) (car s/c))))
-    (walk* v (reify-s v '()))))
-
-(define (reify v s/c)
-  (let ((v (walk* v (car s/c))))
-    (walk* v (reify-s v '()))))
-
 (define (walk* v s)
   (let ((v (walk v s)))
     (cond
@@ -189,6 +180,10 @@
      ((pair? v) (cons (walk* (car v) s)
                       (walk* (cdr v) s)))
      (else  v))))
+
+(define (reify v s/c)
+  (let ((v (walk* v (car s/c))))
+    (walk* v (reify-s v '()))))
 
 (define (reify-s v s)
   (let ((v (walk v s)))
@@ -198,6 +193,10 @@
         (cons `(,v . ,n) s)))
      ((pair? v) (reify-s (cdr v) (reify-s (car v) s)))
      (else s))))
+
+(define (reify-1st s/c)
+  (let ((v (walk* (var 0) (car s/c))))
+    (walk* v (reify-s v '()))))
 
 (define (reify-name n)
   (string->symbol
@@ -214,15 +213,26 @@
                     (app-f/v* (- n 1) (cons x v*)))))))))
     (app-f/v* n '())))
 
-;;;
+(define (appendo l s out)
+  (conde
+   ((== '() l) (== s out))
+   ((fresh (a d res)
+           (== `(,a . ,d) l)
+           (== `(,a . ,res) out)
+           (appendo d s res)))))
 
-;; (define (appendo l s out)
-;;   (conde
-;;    ((== '() l) (== s out))
-;;    ((fresh (a d res)
-;;            (== `(,a . ,d) l)
-;;            (== `(,a . ,res) out)
-;;            (appendo d s res)))))
+
+;;; my stuff
+
+(define (disj* . gs)
+  "disj+ procedure"
+  (if (null? gs) (lambda (s/c) '())
+      (disj (car gs) (apply disj* (cdr gs)))))
+
+(define (conj* . gs)
+  "conj+ procedure"
+  (if (null? gs) (lambda (s/c) s/c)
+      (conj (car gs) (apply conj* (cdr gs)))))
 
 (define (run goal . vars)
   (take-all
@@ -232,108 +242,90 @@
 (use-modules (srfi srfi-26))
 
 (define-public (reify-all goal . names)
+  "reify all variables"
   (let* ((vars (map var names))
          (s/c (apply run (cons goal vars))))
     (map (lambda (s) (map (cut reify <> s) vars)) s/c)))
 
-;; (pk (reify-all (lambda (a? b?)
-;;                  (conj+ (== a? 1)
-;;                         (== b? 2)))
-;;                'a? 'b?))
+(define-syntax-rule (reify* (names ...) goal)
+  "sugar syntax for reify-all"
+  (reify-all (lambda (names ...) goal)
+             'names ...))
 
-;;;
-;;; Tests
-;;;
+;;; Parsing stuff
 
-;; (define (printf message . rest)
-;;   (apply format (append (list #false message) rest)))
+(define (make-leaf! name values)
+  (lambda (in diff^ out^)
+    (lambda (s/c)
+      (let ((in (walk* in (car s/c))))
+        ((apply disj* (map (lambda (value)
+                             (conj+ (== (car in) value)
+                                    (== diff^ (cdr in))
+                                    (== out^ (cons name (car in)))))
+                             values)) s/c)))))
+    
 
-;; (define (errorf flag message . rest)
-;;   (apply printf (cons message rest)))
+(define name! (make-leaf! 'NAME '(amz3 rain1 nekk)))
 
-;; (define-syntax test-check
-;;   (syntax-rules ()
-;;     ((_ title tested-expression expected-result)
-;;      (begin
-;;        (printf "Testing ~s\n" title)
-;;        (let* ((expected expected-result)
-;;               (produced tested-expression))
-;;          (or (equal? expected produced)
-;;              (errorf 'test-check
-;;                      "Failed: ~a~%Expected: ~a~%Computed: ~a~%"
-;;                      'tested-expression expected produced)))))))
+(define determiner! (make-leaf! 'DETERMINER '(a the)))
 
-;; (test-check 'run*
-;;   (run* (q) (fresh (x y) (== `(,x ,y) q) (appendo x y '(1 2 3 4 5))))
-;;   '((() (1 2 3 4 5))
-;;     ((1) (2 3 4 5))
-;;     ((1 2) (3 4 5))
-;;     ((1 2 3) (4 5))
-;;     ((1 2 3 4) (5))
-;;     ((1 2 3 4 5) ())))
+(define noun! (make-leaf! 'NOUN '(space
+                                  cat
+                                  travel
+                                  guitar
+                                  music
+                                  movie
+                                  piano)))
 
-;; (test-check 'run*2
-;;   (run* (q x y) (== `(,x ,y) q) (appendo x y '(1 2 3 4 5)))
-;;   '((() (1 2 3 4 5))
-;;     ((1) (2 3 4 5))
-;;     ((1 2) (3 4 5))
-;;     ((1 2 3) (4 5))
-;;     ((1 2 3 4) (5))
-;;     ((1 2 3 4 5) ())))
+(define verb! (make-leaf! 'VERB '(create see listen play)))
 
-;; (test-check 'rember*o
-;;   (letrec
-;;       ((rember*o (lambda (tr o)
-;;                    (conde
-;;                      ((== '() tr) (== '() o))
-;;                      ((fresh (a d)
-;;                         (== `(,a . ,d) tr)
-;;                         (conde
-;;                           ((fresh (aa da)
-;;                              (== `(,aa . ,da) a)
-;;                              (fresh (a^ d^)
-;;                                (rember*o a a^)
-;;                                (rember*o d d^)
-;;                                (== `(,a^ . ,d^) o))))
-;;                           ((== a 8) (rember*o d o))
-;;                           ((fresh (d^)
-;;                              (rember*o d d^)
-;;                              (== `(,a . ,d^) o))))))))))
-;;        (run 8 (q) (rember*o q '(1 2 8 3 4 5))))
-;;     '((1 2 8 3 4 5)
-;;       (1 2 8 3 4 5 8)
-;;       (1 2 8 3 4 8 5)
-;;       (1 2 8 3 8 4 5)
-;;       (1 2 8 8 3 4 5)
-;;       (1 2 8 8 3 4 5)
-;;       (1 8 2 8 3 4 5)
-;;       (8 1 2 8 3 4 5)))
+(define question! (make-leaf! 'Q '(who how what where)))
 
-;; (test-check 'rember*o
-;;   (letrec
-;;       ((rember*o (lambda (tr o)
-;;                    (conde
-;;                      ((== '() tr) (== '() o))
-;;                      ((fresh (a d)
-;;                         (== `(,a . ,d) tr)
-;;                         (conde
-;;                           ((fresh (aa da)
-;;                              (== `(,aa . ,da) a)
-;;                              (fresh (a^ d^)
-;;                                (== `(,a^ . ,d^) o)
-;;                                (rember*o d d^)
-;;                                (rember*o a a^))))
-;;                           ((== a 8) (rember*o d o))
-;;                           ((fresh (d^)
-;;                              (== `(,a . ,d^) o)
-;;                              (rember*o d d^))))))))))
-;;        (run 9 (q) (rember*o q '(1 (2 8 3 4) 5))))
-;;     '((1 (2 8 3 4) 5)
-;;       (1 (2 8 3 4) 5 8)
-;;       (1 (2 8 3 4) 5 8 8)
-;;       (1 (2 8 3 4) 8 5)
-;;       (1 8 (2 8 3 4) 5)
-;;       (8 1 (2 8 3 4) 5)
-;;       (1 (2 8 3 4) 5 8 8 8)
-;;       (1 (2 8 3 4) 5 8 8 8 8)
-;;       (1 (2 8 3 4) 5 8 8 8 8 8)))
+;; parse rules
+
+(define (np! np diff^ out^)
+  (conde ((fresh (out2)
+                 (name! np diff^ out2)
+                 (== out^ (cons 'NP out2))))
+         ((fresh (fresh diff2 out2 out3)
+                 (determiner! np diff2 out2)
+                 (noun! diff2 diff^ out3)
+                 (== out^ (cons 'NP (cons out2 out3)))))))
+
+(define (s! s diff^ out^)
+  (disj+
+   (fresh (out2 diff2 out3 diff3 out4)
+          (np! s diff2 out2)
+          (verb! diff2 diff3 out3)
+          (np! diff3 diff^ out4)
+          (== out^ (list 'S out2 out3 out4)))
+   (fresh (out2 diff2 out3 diff3 out4)
+          (question! s diff2 out2)
+          (verb! diff2 diff3 out3)
+          (np! diff3 diff^ out4)
+          (== out^ (list 'S out2 out3 out4)))))
+
+
+(define (parse-sentence sentence)
+  (caar (reify* (out)
+                (fresh (diff)
+                       (s! sentence diff out)))))
+
+(define the-cat-play-the-guiar (pk (parse-sentence '(the cat play the guitar))))
+(define who-play-the-guitar (pk (parse-sentence '(who play the guitar))))
+(pk (parse-sentence '(amz3 play the piano)))
+
+(let ((sentences '((the cat play the guitar) (amz3 play the piano))))
+  (let ((sentences (map parse-sentence sentences)))
+    (map (lambda (s)
+           (map pk (reify* (out)
+                           (== (list 'S out '(VERB . play) '(NP (DETERMINER . the) NOUN . guitar)) s))))
+         sentences)))
+
+;;; ((() (S (NP (DETERMINER . a) NOUN . cat) (VERB . play) (NP (DETERMINER . the) NOUN . guitar))))
+
+(define tree '(what the fuck))
+
+;; (define (wheno matcher rewrite)
+;;   (
+
