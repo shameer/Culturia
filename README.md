@@ -20,7 +20,7 @@ interface for common tasks.
 ## Files
 
 Source files can be found in `culturia` directory.
-Documentation can be foudn in `doc` directory.
+Documentation can be found in `doc` directory.
 
 ## Contact
 
