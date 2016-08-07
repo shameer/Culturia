@@ -1,7 +1,8 @@
-# Roadmap
+## Roadmap
 
+(Need an introduction)
 
-## Done
+### Done
 
 Or mostly done.
 
@@ -10,9 +11,9 @@ Or mostly done.
 - cli, a framework for building command line interfaces (incomplete)
 
 
-## Goals
+### Goals
 
-### datastore
+#### datastore
 
 Implement a datastore that is easy to scale and add custom datatypes. This
 materialize in `culture.scm`.
@@ -30,7 +31,7 @@ Tasks:
 - graphical interface
 
 
-### NLP
+#### NLP
   
 - [text segmentation](https://en.wikipedia.org/wiki/Text_segmentation)
 - lemmatizer
@@ -45,14 +46,20 @@ Tasks:
 - Implement chat-80
 
 
-### Datasets
+#### Datasets
 
 - datasets, create wrappers around <atom>
-  - conceptnet
-  - wikidata
-  - http://www.geonames.org/
 
-### Graph Algorithms 
+- conceptnet
+
+- wikidata
+
+- http://www.geonames.org/
+
+...
+
+#### Graph Algorithms 
 
 - PageRank, SimRank, Personnalized PageRank
+
 - other classic algorithms

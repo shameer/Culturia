@@ -1,0 +1,45 @@
+body {
+    font-family: 'Gentium Basic', Georgia, Impact, mono;
+    background: hsl(40, 27%, 91%);
+    font-size: 24px;
+}
+
+h1 {
+    background: hsl(42, 13%, 19%);
+    margin: 0px;
+    padding: 15px;
+    font-family: 'Open Sans', sans;
+    font-weight: normal;
+    font-size: 1.2em;
+}
+
+h1 a {
+    color: white;
+    text-decoration: none;
+}
+
+#container {
+    padding: 15px;
+    max-width: 900px;
+    line-height: 1.4em;
+    color: hsl(41, 28%, 31%);
+    background: white;
+    border-radius: 3px;
+    margin: 15px;
+              
+}
+
+a {
+    color: hsl(90, 50%, 40%);
+    text-decoration: none;
+}
+
+code {
+    font-family: mono;
+    color: black;
+    font-size: 14px;
+}
+
+p small {
+    margin: 15px;
+}
