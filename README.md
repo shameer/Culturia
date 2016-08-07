@@ -17,12 +17,10 @@ The name is a reference to
 Create a framework that makes it easy to tape into NLP algorithm and provide an
 interface for common tasks.
 
-Look at `ROADMAP.md` for a detailed version of the roadmap.
-
 ## Files
 
-Source files can be found in `culturia` directory. Also there is a
-`CHANGELOG.md` where I blog about my progress. `HACKING.md` is mostly blabla.
+Source files can be found in `culturia` directory.
+Documentation can be foudn in `doc` directory.
 
 ## Contact
 
