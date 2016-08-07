@@ -10,4 +10,4 @@
                                    conceptnet-command)))
 
 
-(program-execute (program-arguments) culturia)
+(pk (program-execute (program-arguments) culturia))

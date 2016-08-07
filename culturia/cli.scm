@@ -16,7 +16,6 @@
 (define-record-type* <command>
   name
   help
-  subs
   argument
   options
   lambda)
