@@ -23,11 +23,71 @@ Culturia is a reference to
 [Culture and Empire by Pieter Hintjens](http://cultureandempire.com) and
 [Intelligence Augmentation](https://en.wikipedia.org/wiki/Intelligence_amplification).
 
+## Roadmap
+
+Ideas of things that should be done at some point.
+
+### Datastore
+
+The database is built upon [wiredtiger](http://wireditger.com).
+
+- re-explore workspaces/vcs
+
+- re-explore recursive graphdb
+
+- add indices: geohash, z-index, trigram, full-text search
+
+- improve srfi 41 to match `gremlin` API
+
+- add a graphical interface
+
+### NLP/NLU
+
+...
+
+- [text segmentation](https://en.wikipedia.org/wiki/Text_segmentation)
+  
+- lemmatizer
+  
+- syntax parser via Grammar Link
+  
+- dependency tree
+  
+- Implement a similar feature as wordvec: `king - man = queen`
+  
+- Summarization: LexRank, TextRank, TopicRank
+
+- natural language interface (cf. quepy)
+
+- Implement chat-80
+
+### Datasets
+
+- stackoverflow, wikipedia, wiktionary, hackernews
+
+- conceptnet, wikidata
+
+- geonames.org
+
+### Graph Algorithms 
+
+- PageRank, SimRank, Personnalized PageRank
+
+- other classic algorithms
+
 ## Blog
 
 ### 0.0 - Youthful Indiscretion
 
 This project started as an exploration of opencog hypergraph database.
+
+Other documents written in the course of this journey:
+
+- [dyna: extending datalog for modern ai](dyna-extending-datalog-for-modern-ai.htlm)
+
+- [opencog overview](opencog-overview.html)
+
+- [knowledge based ai (udacity)](udacity-knowledge-based-ai.html)
 
 #### 2015/09/22 - What Are The Civilian Applications?
 
