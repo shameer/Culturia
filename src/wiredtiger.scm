@@ -1,6 +1,6 @@
-;; guile-wiredtiger - 0.2 - 2015/10/22
+;; guile-wiredtiger - 0.4 - 2016/07/07
 
-;; Copyright © 2014-2015 Amirouche BOUBEKKI <amirouche@hypermove.net>
+;; Copyright © 2014-2016 Amirouche BOUBEKKI <amirouche at hypermove net>
 
 ;; guile-wiredtiger is free software: you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
@@ -17,7 +17,7 @@
 
 ;;; Comment:
 ;;
-;; Tested with wiredtiger-2.6.1
+;; Tested with wiredtiger develop branch
 ;;
 
 (define-module (wiredtiger))
@@ -37,17 +37,17 @@
 (use-modules (system foreign))  ;; ffi
 
 ;;;
-;;; srfi-99
+;;; plain
 ;;;
 ;;
-;; macro to quickly define immutable records
+;; macro to quickly define records
 ;;
 ;;
 ;; Usage:
 ;;
-;;   (define-record-type <abc> field-one field-two)
-;;   (define zzz (make-abc 1 2))
-;;   (abc-field-one zzz) ;; => 1
+;;   (define-record-type <car> seats wheels)
+;;   (define smart (make-car 2 4))
+;;   (car-seats smart) ;; => 2
 ;;
 
 (define-syntax define-record-type*
@@ -73,79 +73,45 @@
 
 ;;; ffi helpers
 
-(define *NULL* %null-pointer)
-(define *pointer* '*)
+(define NULL %null-pointer)
+(define POINTER '*)
 
-;; This is small syntax change
-(define* ((dynamic-link* shared-object) func-name)
-  (dynamic-func func-name shared-object))
+(define* (dynamic-link* #:optional library-name)
+  (let ((shared-object (if library-name (dynamic-link library-name) (dynamic-link))))
+    (lambda (return-value function-name . arguments)
+      (let ((function (dynamic-func function-name shared-object)))
+        (pointer->procedure return-value function arguments)))))
 
-;;; foreign macro
+(define (pointer->procedure* return-type function-pointer . args_types)
+  (pointer->procedure return-type function-pointer args_types))
 
-(define-syntax-rule (foreign
-                     ;; function pointer and signature
-                     (ret function-pointer args ...)
-                     ;; foreign-function lambda wrapper
-                     wrapper)
-  (let ((foreign-function (pointer->procedure ret
-                                              function-pointer
-                                              (list args ...))))
-    (lambda  rest
-        (apply wrapper (append (list foreign-function) rest)))))
-
-;;: utils
-
-(define (make constructor constructor-structure pointer size)
-  "Convert a POINTER to a structure of SIZE and into a record
-   using CONSTRUCTOR and where the structure is wrapped using
-   CONSTRUCTOR-STRUCTURE"
+(define (make constructor pointer size)
   (let* ((pointer (make-pointer (array-ref pointer 0)))
-         (array (pointer->bytevector pointer size 0 'u64))
-         (structure (apply constructor-structure (map make-pointer (array->list array)))))
-    (constructor pointer structure)))
+         (struct (map make-pointer (u64vector->list (pointer->bytevector pointer size 0 'u64)))))
+    (apply constructor (cons pointer struct))))
 
 ;;;
 ;;; wiredtiger bindings
 ;;;
 
-(define wiredtiger (dynamic-link "libwiredtiger.so"))
-(define wiredtiger* (dynamic-link* wiredtiger))
+(define wiredtiger (dynamic-link* "libwiredtiger.so"))
 
+(define* wiredtiger-string-error
+  (let ((function (wiredtiger POINTER "wiredtiger_strerror" int)))
+    (lambda (code)
+      (pointer->string (function code)))))
 
-(define-public WT_NOTFOUND -31803)
-
-
-;;
-;; (wiredtiger-error-string code)
-;;
-
-(define* (%wiredtiger-string-error call)
-  (foreign
-   (*pointer* (wiredtiger* "wiredtiger_strerror") int)
-   (lambda (foreign-function code)
-     (let ((message (pointer->string (foreign-function code))))
-       (format #t "wiredtiger error while calling ~a: ~a" call message))
-       ;; here we use (exit) instead of (error) which outputs a not very useful traceback
-       (exit -1))))
-
-(define (wiredtiger-string-error call message)
-  ((%wiredtiger-string-error call) message))
-
+(define (check code)
+  (unless (eq? code 0)
+    (throw 'wiredtiger (wiredtiger-string-error code))))
 
 ;;;
 ;;; Connection
 ;;;
 
-(define-record-type* <connection> handle structure)
+(define-record-type* <*connection>
+  pointer
 
-(set-record-type-printer! <connection>
-                          (lambda (record port)
-                            (format port
-                                    "<connection 0x~x>"
-                                    (pointer-address (connection-handle record)))))
-
-;; record holding structure pointers
-(define-record-type* <connection-structure>
   async-flush
   async-new-op
   close
@@ -162,60 +128,46 @@
   add-extractor
   get-extension-api)
 
-(define-public connection-open
-  (foreign
-   (int (wiredtiger* "wiredtiger_open") *pointer* *pointer* *pointer* *pointer*)
-   (lambda (foreign-function home config)
-     (let* (;; init a double pointer
-            (pointer (u64vector 0))
-            (double-pointer (bytevector->pointer pointer))
-            ;; convert arguments to c types
-            (%home (string->pointer home))
-            (%config (string->pointer config))
-            ;; call the foreign function
-            ;; FIXME: add support for error_handler
-           (code (foreign-function %home *NULL* %config double-pointer)))
-       (if (eq? code 0)
-           (make make-connection make-connection-structure pointer 15)
-           (let ((message (format #false "(wiredtiger-open ~s ~s)" home config)))
-             (wiredtiger-string-error message code)))))))
+(set-record-type-printer! <*connection>
+                          (lambda (record port)
+                            (format port
+                                    "<connection 0x~x>"
+                                    (pointer-address (*connection-pointer record)))))
 
-(define (%connection-close connection)
-  (foreign
-   (int  (connection-structure-close (connection-structure connection)) *pointer* *pointer*)
-   (lambda (foreign-function config)
-     (let* (;; init a double pointer
-            (pointer (u64vector 0))
-            (double-pointer (bytevector->pointer pointer))
-            ;; convert arguments to c types
-            (%config (string->pointer config))
-            ;; call the foreign function
-            ;; FIXME: add support for error_handler
-            (code (foreign-function (connection-handle connection) %config)))
-       (if (eq? code 0)
-           #true
-           (let ((message (format #false "(connection-close ~s ~s)" connection config)))
-             (wiredtiger-string-error message code)))))))
+(define-public connection-open
+  (let ((function (wiredtiger int "wiredtiger_open" POINTER POINTER POINTER POINTER)))
+    (lambda (home config)
+      (let* (;; init a double pointer
+             (pointer (u64vector 0))
+             (double-pointer (bytevector->pointer pointer))
+             ;; convert arguments to c types
+             (home (string->pointer home))
+             (config (string->pointer config)))
+      ;; FIXME: add support for error_handler
+      (check (function home NULL config double-pointer))
+      (make make-*connection pointer 15)))))
+
 
 (define*-public (connection-close connection #:optional (config ""))
-  ((%connection-close connection) config))
+  (let ((function (pointer->procedure* int (*connection-close connection) POINTER POINTER)))
+    (let* (;; init a double pointer
+           (pointer (u64vector 0))
+           (double-pointer (bytevector->pointer pointer))
+           ;; convert arguments to c types
+           (config (string->pointer config)))
+           ;; FIXME: add support for error_handler
+      (check (function (*connection-pointer connection) config)))))
+
 
 ;;;
 ;;; Session
 ;;;
 
-(define-record-type* <session> handle structure)
+(define-record-type* <*session>
+  pointer
 
-(set-record-type-printer! <session>
-                          (lambda (record port)
-                            (format port
-                                    "<session 0x~x>"
-                                    (pointer-address (session-handle record)))))
-
-;; record holding structure pointers
-(define-record-type* <session-structure>
   connection
-  %app-private%
+  app-private
   close
   reconfigure
   string-error
@@ -223,8 +175,12 @@
   create
   compact
   drop
+  join
+  log-flush
   log-printf
+  rebalance
   rename
+  reset
   salvage
   truncate
   upgrade
@@ -237,128 +193,68 @@
   transaction-pinned-range
   transaction-sync)
 
-(define (%session-string-error session)
-  (foreign
-   (int (session-structure-string-error (session-structure session)) *pointer* int)
-   (lambda (foreign-function code)
-     (format #true
-             "wiredtiger session error: ~a"
-             (pointer->string (make-pointer (foreign-function (session-handle session) code))))
-     (exit -1))))
+(set-record-type-printer! <*session>
+                          (lambda (record port)
+                            (format port
+                                    "<session 0x~x>"
+                                    (pointer-address (*session-pointer record)))))
 
-(define-public (session-string-error session code)
-  ((%session-string-error session) code))
+(define (session-string-error* session code)
+  (let ((function (pointer->procedure* POINTER (*session-string-error session) POINTER int)))
+    (pointer->string (function (*session-pointer session) code))))
 
-(define (%session-open connection)
-  (foreign
-   (int  (connection-structure-open-session (connection-structure connection)) *pointer* *pointer* *pointer* *pointer*)
-   (lambda (foreign-function config)
-     (let* (;; init a double pointer
-            (pointer (u64vector 0))
-            (double-pointer (bytevector->pointer pointer))
-            ;; convert arguments to c types
-            (%config (string->pointer config))
-            ;; call the foreign function
-            ;; FIXME: add support for error_handler
-            (code (foreign-function (connection-handle connection) *NULL* %config double-pointer)))
-       (if (eq? code 0)
-           (make make-session make-session-structure pointer 22)
-           (let ((message (format #false "(session-open ~s ~s)" connection config)))
-             (wiredtiger-string-error message code)))))))
-
+(define (session-check session code)
+  (unless (eq? code 0)
+    (throw 'wiredtiger (session-string-error* session code))))
 
 (define*-public (session-open connection #:optional (config ""))
-  ((%session-open connection) config))
-
-(define (%session-create session)
-  (foreign
-   (int  (session-structure-create (session-structure session)) *pointer* *pointer* *pointer*)
-   (lambda (foreign-function name config)
-     (let* (;; convert arguments to c types
-            (%name (string->pointer name))
-            (%config (string->pointer config))
-            ;; call the foreign function
-            (code (foreign-function (session-handle session) %name %config)))
-       (if (not (eq? code 0))
-           (let ((message (format #false "(session-create ~s ~s)" name config)))
-             (wiredtiger-string-error message code)))))))
+  (let ((function (pointer->procedure* int (*connection-open-session connection) POINTER POINTER POINTER POINTER)))
+    (let* (;; init a double pointer
+           (pointer (u64vector 0))
+           (double-pointer (bytevector->pointer pointer))
+           ;; convert arguments to c types
+           (config (string->pointer config))
+           ;; call the foreign function
+           ;; FIXME: add support for error_handler
+           (code (function (*connection-pointer connection) NULL config double-pointer)))
+      (check  code)
+      (make make-*session pointer 26))))
 
 (define-public (session-create session name config)
-  ((%session-create session) name config))
-
-(define (%session-close session)
-  (foreign
-   (int  (session-structure-close (session-structure session)) *pointer*)
-   (lambda (foreign-function)
-     (let* (;; call the foreign function
-            (code (foreign-function (session-handle session))))
-       (if (not (eq? code 0))
-           (let ((message (format #false "(session-close ~s)" session)))
-             (wiredtiger-string-error message code)))))))
+  (let ((function (pointer->procedure* int (*session-create session) POINTER POINTER POINTER)))
+    (let* (;; convert arguments to c types
+           (name (string->pointer name))
+           (config (string->pointer config))
+           ;; call the foreign function
+           (code (function (*session-pointer session) name config)))
+      (session-check session code))))
 
 (define-public (session-close session)
-  ((%session-close session)))
-
-(define (%session-transaction-begin session)
-  (foreign
-   (int (session-structure-transaction-begin (session-structure session)) *pointer* *pointer*)
-   (lambda (foreign-function config)
-     (let* ((%config (string->pointer config))
-            ;; call the foreign function
-            (code (foreign-function (session-handle session) %config)))
-       (if (eq? code 0)
-           #true
-           (let ((message (format #false "(session-transaction-begin ~s ~s)" session config)))
-             (wiredtiger-string-error message code)))))))
+  (let ((function (pointer->procedure* int (*session-close session) POINTER)))
+    (session-check session (function (*session-pointer session)))))
 
 (define*-public (session-transaction-begin session #:optional (config ""))
-  ((%session-transaction-begin session) config))
-
-(define (%session-transaction-commit session)
-  (foreign
-   (int  (session-structure-transaction-commit (session-structure session)) *pointer* *pointer*)
-   (lambda (foreign-function config)
-     (let* ((%config (string->pointer config))
-            ;; call the foreign function
-            (code (foreign-function (session-handle session) %config)))
-       (if (eq? code 0)
-           #true
-           (let ((message (format #false "(session-transaction-commit ~s ~s)" session config)))
-             (wiredtiger-string-error message code)))))))
+  (let ((function (pointer->procedure* int (*session-transaction-begin session) POINTER POINTER)))
+    (session-check session (function (*session-pointer session) (string->pointer config)))))
 
 (define*-public (session-transaction-commit session #:optional (config ""))
-  ((%session-transaction-commit session) config))
-
-(define (%session-transaction-rollback session)
-  (foreign
-   (int  (session-structure-transaction-rollback (session-structure session)) *pointer* *pointer*)
-   (lambda (foreign-function name config)
-     (let* ((%config (string->pointer config))
-            ;; call the foreign function
-            (code (foreign-function (session-handle session) %config)))
-       (if (eq? code 0)
-           #true
-           (let ((message (format #false "(session-transaction-rollback ~s ~s)" session config)))
-             (wiredtiger-string-error message code)))))))
+  (let ((function (pointer->procedure* int (*session-transaction-commit session) POINTER POINTER)))
+    (session-check session (function (*session-pointer session) (string->pointer config)))))
 
 (define*-public (session-transaction-rollback session #:optional (config ""))
-  ((%session-transaction-rollback session) config))
+  (let ((function (pointer->procedure* int (*session-transaction-rollback session) POINTER POINTER)))
+    (session-check session (function (*session-pointer session) (string->pointer config)))))
 
 ;;;
 ;;; Cursor
 ;;;
 
-(define-record-type* <cursor> handle structure)
-
-(set-record-type-printer! <cursor>
-                          (lambda (record port)
-                            (format port
-                                    "<cursor 0x~x>"
-                                    (pointer-address (cursor-handle record)))))
-
-;; record holding structure pointers
-(define-record-type* <cursor-structure>
+(define-record-type* <*cursor>
+  pointer
   session
+  config
+
+  session-pointer
   uri
   key-format
   value-format
@@ -381,34 +277,43 @@
   ;; XXX: other fields are defined in the header
   ;;      those are only useful to implement a new cursor type
   ;;      and as such are not part the record
-)
+  )
+
+(set-record-type-printer! <*cursor>
+                          (lambda (record port)
+                            (format port
+                                    "<cursor 0x~x uri=~s key=~s value=~s config=~s>"
+                                    (pointer-address (*cursor-pointer record))
+                                    (pointer->string (*cursor-uri record))
+                                    (cursor-key-format record)
+                                    (cursor-value-format record)
+                                    (*cursor-config record))))
 
 (define (cursor-key-format cursor)
-  (pointer->string (cursor-structure-key-format (cursor-structure cursor))))
+  ;; FIXME: cache this value
+  (pointer->string (*cursor-key-format cursor)))
 
 (define (cursor-value-format cursor)
-  (pointer->string (cursor-structure-value-format (cursor-structure cursor))))
-
-(define (%cursor-open session)
-  (foreign
-   (int (session-structure-cursor-open (session-structure session)) *pointer* *pointer* *pointer* *pointer* *pointer*)
-   (lambda (foreign-function uri config)
-     (let* (;; init a double pointer
-            (pointer (u64vector 0))
-            (double-pointer (bytevector->pointer pointer))
-            ;; convert arguments to c types
-            (%uri (string->pointer uri))
-            (%config (string->pointer config))
-            ;; call the foreign function
-            (code (foreign-function (session-handle session) %uri *NULL* %config double-pointer)))
-       (if (eq? code 0)
-           (make make-cursor make-cursor-structure pointer 20)
-           (let ((message (format #false "(cursor-open ~a ~s ~s)" session uri config)))
-             (wiredtiger-string-error message code)))))))
+  ;; FIXME: cache this value
+  (pointer->string (*cursor-value-format cursor)))
 
 (define*-public (cursor-open session uri #:optional (config ""))
-  ((%cursor-open session) uri config))
-
+  (let ((function (pointer->procedure* int (*session-cursor-open session) POINTER POINTER POINTER POINTER POINTER)))
+    (let* (;; init a double pointer
+           (pointer (u64vector 0))
+           (double-pointer (bytevector->pointer pointer))
+           ;; call the foreign function
+           (code (function (*session-pointer session)
+                           (string->pointer uri)
+                           NULL
+                           (string->pointer config)
+                           double-pointer)))
+      (session-check session code)
+      ;; make cursor record
+      (let* ((size 20)
+             (pointer (make-pointer (array-ref pointer 0)))
+             (struct (map make-pointer (u64vector->list (pointer->bytevector pointer size 0 'u64)))))
+        (apply make-*cursor (cons* pointer session config struct))))))
 
 ;;; key/value set/ref
 
@@ -417,7 +322,6 @@
 
 (define (item->integer bv)
   (array-ref bv 0))
-
 
 (define *item->value* `((#\S . ,item->string)
                         (#\Q . ,item->integer)
@@ -437,32 +341,22 @@
                  (append out (list ((assoc-ref *item->value* (car formats)) (car pointers)))))))))
 
 (define-public (cursor-key-ref cursor)
-  (let* ((args (map (lambda (_) (u64vector 0)) (string->list (cursor-key-format cursor))))
-         (args* (append (list (cursor-handle cursor)) (map bytevector->pointer args)))
-         (signature (map (lambda (_) *pointer*) args*))
-         (proc (pointer->procedure int
-                                   (cursor-structure-key-ref (cursor-structure cursor))
-                                   signature)))
-    (apply proc args*)
+  (let* ((args (map (lambda _ (u64vector 0)) (string->list (cursor-key-format cursor))))
+         (args* (cons (*cursor-pointer cursor) (map bytevector->pointer args)))
+         (signature (map (lambda _ POINTER) args*))
+         (function (pointer->procedure int (*cursor-key-ref cursor) signature)))
+    (apply function args*)
     (pointers->scm (cursor-key-format cursor) args)))
 
-
 (define-public (cursor-value-ref cursor)
-  (let* ((args (map (lambda ignore (u64vector 0))
-                    (string->list (cursor-value-format cursor))))
-         (args* (append (list (cursor-handle cursor))
-                        (map bytevector->pointer args)))
-         (signature (map (lambda (_) *pointer*) args*))
-         (proc (pointer->procedure int
-                                   (cursor-structure-value-ref (cursor-structure cursor))
-                                   signature)))
-    (apply proc args*)
+  (let* ((args (map (lambda _ (u64vector 0)) (string->list (cursor-value-format cursor))))
+         (args* (cons (*cursor-pointer cursor) (map bytevector->pointer args)))
+         (signature (map (lambda _ POINTER) args*))
+         (function (pointer->procedure int (*cursor-value-ref cursor) signature)))
+    (apply function args*)
     (pointers->scm (cursor-value-format cursor) args)))
 
-
-
 ;;; set procedures
-
 
 (define make-string-pointer
   (compose bytevector->pointer
@@ -488,150 +382,254 @@
                  (append out (list ((assoc-ref *format->pointer* (car formats)) (car values)))))))))
 
 (define-public (cursor-key-set cursor . key)
-  (let* ((args (append (list (cursor-handle cursor)) (formats->items (cursor-key-format cursor) key)))
-         (signature (map (lambda (_) *pointer*) args))
-         (proc (pointer->procedure int
-                                   (cursor-structure-key-set (cursor-structure cursor))
-                                   signature)))
-    (apply proc args)))
-
+  (let* ((args (cons (*cursor-pointer cursor) (formats->items (cursor-key-format cursor) key)))
+         (signature (map (lambda ignore POINTER) args))
+         (function (pointer->procedure int (*cursor-key-set cursor) signature)))
+    (apply function args)))
 
 (define-public (cursor-value-set cursor . value)
-  (let* ((args (append (list (cursor-handle cursor)) (formats->items (cursor-value-format cursor) value)))
-         (signature (map (lambda (_) *pointer*) args))
-         (proc (pointer->procedure int
-                                   (cursor-structure-value-set (cursor-structure cursor))
-                                   signature)))
-    (apply proc args)))
-
-(define (%cursor-reset cursor)
-  (foreign
-   (int (cursor-structure-reset (cursor-structure cursor)) *pointer*)
-   (lambda (foreign-function)
-     (let* (;; call the foreign function
-            (code (foreign-function (cursor-handle cursor))))
-       (if (eq? code 0)
-           #true
-           (let ((message (format #false "(cursor-reset ~a)" cursor)))
-             (wiredtiger-string-error message code)))))))
+  (let* ((args (cons (*cursor-pointer cursor) (formats->items (cursor-value-format cursor) value)))
+         (signature (map (lambda ignore POINTER) args))
+         (function (pointer->procedure int (*cursor-value-set cursor) signature)))
+    (apply function args)))
 
 (define-public (cursor-reset cursor)
-  ((%cursor-reset cursor)))
-
-(define (%cursor-next cursor)
-  (foreign
-   (int (cursor-structure-next (cursor-structure cursor)) *pointer*)
-   (lambda (foreign-function)
-     (let* (;; call the foreign function
-            (code (foreign-function (cursor-handle cursor))))
-       (if (eq? code 0)
-           #true
-           (if (eq? code WT_NOTFOUND)
-               #false
-               (let ((message (format #false "(cursor-next ~a)" cursor)))
-                 (wiredtiger-string-error message code))))))))
+  (let ((function (pointer->procedure* int (*cursor-reset cursor) POINTER)))
+    (session-check (*cursor-session cursor) (function (*cursor-pointer cursor)))))
 
 (define-public (cursor-next cursor)
-  ((%cursor-next cursor)))
-
-(define (%cursor-previous cursor)
-  (foreign
-   (int (cursor-structure-previous (cursor-structure cursor)) *pointer*)
-   (lambda (foreign-function)
-     (let* (;; call the foreign function
-            (code (foreign-function (cursor-handle cursor))))
-       (if (eq? code 0)
-           #true
-           (let ((message (format #false "(cursor-previous ~a)" cursor)))
-             (wiredtiger-string-error message code)))))))
+  (let ((function (pointer->procedure* int (*cursor-next cursor) POINTER)))
+    (session-check (*cursor-session cursor) (function (*cursor-pointer cursor)))))
 
 (define-public (cursor-previous cursor)
-  ((%cursor-previous cursor)))
-
-(define (%cursor-search cursor)
-  (foreign
-   (int (cursor-structure-search (cursor-structure cursor)) *pointer*)
-   (lambda (foreign-function)
-     (let* (;; call the foreign function
-            (code (foreign-function (cursor-handle cursor))))
-       (if (eq? code 0)
-           #true
-           #false)))))
+  (let ((function (pointer->procedure* int (*cursor-previous cursor) POINTER)))
+    (session-check (*cursor-session cursor) (function (*cursor-pointer cursor)))))
 
 (define-public (cursor-search cursor)
-  ((%cursor-search cursor)))
-
-(define (%cursor-search-near cursor)
-  (foreign
-   (int (cursor-structure-search-near (cursor-structure cursor)) *pointer* *pointer*)
-   (lambda (foreign-function)
-     (let* (;; init a integer pointer
-            (integer (u64vector 0))
-            (pointer (bytevector->pointer integer))
-            ;; call the foreign function
-            (code (foreign-function (cursor-handle cursor) pointer)))
-       (if (eq? code 0)
-           (array-ref integer 0)
-           (if (eq? code WT_NOTFOUND)
-               #false
-               (let ((message (format #false "(cursor-search-near ~a)" cursor)))
-                 (wiredtiger-string-error message code))))))))
+  (let ((function (pointer->procedure* int (*cursor-search cursor) POINTER)))
+    (session-check (*cursor-session cursor) (function (*cursor-pointer cursor)))))
 
 (define-public (cursor-search-near cursor)
-  ((%cursor-search-near cursor)))
-
-(define (%cursor-insert cursor)
-  (foreign
-   (int (cursor-structure-insert (cursor-structure cursor)) *pointer*)
-   (lambda (foreign-function)
-     (let* (;; call the foreign function
-            (code (foreign-function (cursor-handle cursor))))
-       (if (eq? code 0)
-           #true
-           (let ((message (format #false "(cursor-insert ~a)" cursor)))
-             (wiredtiger-string-error message code)))))))
+  (let ((function (pointer->procedure* int (*cursor-search-near cursor) POINTER POINTER)))
+    (let* ((integer (s32vector 0))
+           (pointer (bytevector->pointer integer)))
+      (session-check (*cursor-session cursor) (function (*cursor-pointer cursor) pointer))
+      (s32vector-ref integer 0))))
 
 (define-public (cursor-insert cursor)
-  ((%cursor-insert cursor)))
-
-(define (%cursor-update cursor)
-  (foreign
-   (int (cursor-structure-update (cursor-structure cursor)) *pointer*)
-   (lambda (foreign-function)
-     (let* (;; call the foreign function
-            (code (foreign-function (cursor-handle cursor))))
-       (if (eq? code 0)
-           #true
-           (let ((message (format #false "(cursor-update ~a)" cursor)))
-             (wiredtiger-string-error message code)))))))
+  (let ((function (pointer->procedure* int (*cursor-insert cursor) POINTER)))
+    (session-check (*cursor-session cursor) (function (*cursor-pointer cursor)))))
 
 (define-public (cursor-update cursor)
-  ((%cursor-update cursor)))
-
-(define (%cursor-remove cursor)
-  (foreign
-   (int (cursor-structure-remove (cursor-structure cursor)) *pointer*)
-   (lambda (foreign-function)
-     (let* (;; call the foreign function
-            (code (foreign-function (cursor-handle cursor))))
-       (if (eq? code 0)
-           #true
-           (let ((message (format #false "(cursor-remove ~a)" cursor)))
-             (wiredtiger-string-error message code)))))))
+  (let ((function (pointer->procedure* int (*cursor-update cursor) POINTER)))
+    (session-check (*cursor-session cursor) (function (*cursor-pointer cursor)))))
 
 (define-public (cursor-remove cursor)
-  ((%cursor-remove cursor)))
-
-(define (%cursor-close cursor)
-  (foreign
-   (int (cursor-structure-close (cursor-structure cursor)) *pointer*)
-   (lambda (foreign-function)
-     (let* (;; call the foreign function
-            (code (foreign-function (cursor-handle cursor))))
-       (if (eq? code 0)
-           #true
-           (let ((message (format #false "(cursor-close ~a)" cursor)))
-             (wiredtiger-string-error message code)))))))
+  (let ((function (pointer->procedure* int (*cursor-remove cursor) POINTER)))
+    (session-check (*cursor-session cursor) (function (*cursor-pointer cursor)))))
 
 (define-public (cursor-close cursor)
-  ((%cursor-close cursor)))
+  (let ((function (pointer->procedure* int (*cursor-close cursor) POINTER)))
+    (session-check (*cursor-session cursor) (function (*cursor-pointer cursor)))))
+
+;;;
+;;; tests
+;;;
+
+(define (path-join . rest)
+  "Return the absolute path made of REST. If the first item
+   of REST is not absolute the current working directory
+   will be  prepend"
+  (let ((path (string-join rest "/")))
+    (if (string-prefix? "/" path)
+        path
+        (string-append (getcwd) "/" path))))
+
+
+(define (path-dfs-walk dirpath proc)
+  (define dir (opendir dirpath))
+  (let loop ()
+    (let ((entry (readdir dir)))
+      (cond
+       ((eof-object? entry))
+       ((or (equal? entry ".") (equal? entry "..")) (loop))
+       (else (let ((path (path-join dirpath entry)))
+               (if (equal? (stat:type (stat path)) 'directory)
+                   (begin (path-dfs-walk path proc)
+                          (proc path))
+                   (begin (proc path) (loop))))))))
+  (closedir dir)
+  (proc (path-join dirpath)))
+
+
+(define (rmtree path)
+  (path-dfs-walk path (lambda (path)
+                        (if (equal? (stat:type (stat path)) 'directory)
+                            (rmdir path)
+                            (delete-file path)))))
+
+
+(define-syntax-rule (with-directory path e ...)
+  (begin
+    (when (access? path F_OK)
+      (rmtree path))
+    (mkdir path)
+    e ...
+    (rmtree path)))
+
+
+(define-syntax-rule (with-cnx cnx e ...)
+  (let ((out (begin e ...)))
+    (connection-close cnx)
+    out))
+
+;;; test-check
+
+(define-syntax test-check
+  (syntax-rules ()
+    ((_ title tested-expression expected-result)
+     (with-directory "/tmp/wt"
+                     (format #t "** Checking ~a\n" title)
+                     (let* ((expected expected-result)
+                            (produced tested-expression))
+                       (if (not (equal? expected produced))
+                           (begin (format #t "*** Expected: ~s\n" expected)
+                                  (format #t "*** Computed: ~s\n" produced))))))))
+
+
+(when (or (getenv "CHECK") (getenv "CHECK_WIREDTIGER"))
+  (format #true "* testing wiredtiger\n")
+
+  (test-check "create and close database"
+              (with-cnx (connection-open "/tmp/wt" "create") #true)
+              #true)
+
+  (test-check "table with index, insert and index value"
+              (let* ((cnx (connection-open "/tmp/wt" "create"))
+                     (session (session-open cnx)))
+                ;; create a table
+                (session-create session "table:nodes" "key_format=Q,value_format=SS,columns=(a,b,c)")
+                (session-create session "index:nodes:index" "columns=(b,c)")
+                ;; open a cursor over that table
+                (let ((cursor (cursor-open session "table:nodes")))
+                  (session-transaction-begin session "isolation=\"snapshot\"")
+                  (cursor-key-set cursor 42)
+                  (cursor-value-set cursor "a" "b")
+                  (cursor-insert cursor)
+                  (session-transaction-commit session)
+                  (let ((index (cursor-open session "index:nodes:index(a)")))
+                    (cursor-next index)
+                    (with-cnx cnx
+                      (list (cursor-key-ref index) (cursor-value-ref index))))))
+              (list (list "a" "b") (list 42)))
+
+  (test-check "cursor search on empty table"
+              (let* ((cnx (connection-open "/tmp/wt" "create"))
+                     (session (session-open cnx)))
+                ;; create a table
+                (session-create session "table:nodes" "key_format=Q,value_format=SS,columns=(a,b,c)")
+                ;; open a cursor over that table
+                (let ((cursor (cursor-open session "table:nodes")))
+                  (cursor-key-set cursor 42)
+                  (with-cnx cnx
+                    (catch 'wiredtiger
+                      (lambda () (cursor-search cursor) #false)
+                      (lambda (key value) #true)))))
+              #true)
+
+  (test-check "cursor search"
+              (let* ((cnx (connection-open "/tmp/wt" "create"))
+                     (session (session-open cnx)))
+                ;; create a table
+                (session-create session "table:nodes" "key_format=Q,value_format=SS,columns=(a,b,c)")
+                ;; open a cursor over that table
+                (let ((cursor (cursor-open session "table:nodes")))
+                  (cursor-key-set cursor 42)
+                  (cursor-value-set cursor "b" "c")
+                  (cursor-insert cursor)
+                  (cursor-key-set cursor 42)
+                  (with-cnx cnx
+                    (catch #true
+                      (lambda () (cursor-search cursor) #true)
+                      (lambda _ #false)))))
+              #true)
+
+  (test-check "cursor search near on empty table"
+              (let* ((cnx (connection-open "/tmp/wt" "create"))
+                     (session (session-open cnx)))
+                (session-create session "table:nodes" "key_format=Q,value_format=S,columns=(a,b)")
+                (let ((cursor (cursor-open session "table:nodes")))
+                  (cursor-key-set cursor 42)
+                  (with-cnx cnx
+                            (catch #true
+                              (lambda () (cursor-search-near cursor) #false)
+                              (lambda _ #true)))))
+              #true)
+
+  (test-check "cursor search near below"
+              (let* ((cnx (connection-open "/tmp/wt" "create"))
+                     (session (session-open cnx)))
+                (session-create session "table:nodes" "key_format=Q,value_format=S,columns=(a,b)")
+                (let ((cursor (cursor-open session "table:nodes")))
+                  ;; prepare
+                  (cursor-key-set cursor 42)
+                  (cursor-value-set cursor "magic number")
+                  (cursor-insert cursor)
+                  ;; test
+                  (cursor-key-set cursor 43)
+                  (with-cnx cnx
+                    (cursor-search-near cursor))))
+              -1)
+
+  (test-check "cursor search near above"
+              (let* ((cnx (connection-open "/tmp/wt" "create"))
+                     (session (session-open cnx)))
+                (session-create session "table:nodes" "key_format=Q,value_format=S,columns=(a,b)")
+                (let ((cursor (cursor-open session "table:nodes")))
+                  ;; prepare
+                  (cursor-key-set cursor 41)
+                  (cursor-value-set cursor "another number")
+                  (cursor-insert cursor)
+                  (cursor-key-set cursor 42)
+                  (cursor-value-set cursor "magic number")
+                  (cursor-insert cursor)
+                  (cursor-key-set cursor 45)
+                  (cursor-value-set cursor "random number")
+                  (cursor-insert cursor)
+                  ;; test
+                  (cursor-key-set cursor 43)
+                  (with-cnx cnx
+                    (< 0 (cursor-search-near cursor)))))
+              #true)
+
+  (test-check "cursor search near exact match"
+              (let* ((cnx (connection-open "/tmp/wt" "create"))
+                     (session (session-open cnx)))
+                (session-create session "table:nodes" "key_format=Q,value_format=S,columns=(a,b)")
+                (let ((cursor (cursor-open session "table:nodes")))
+                  ;; prepare
+                  (cursor-key-set cursor 41)
+                  (cursor-value-set cursor "another number")
+                  (cursor-insert cursor)
+                  (cursor-key-set cursor 42)
+                  (cursor-value-set cursor "magic number")
+                  (cursor-insert cursor)
+                  (cursor-key-set cursor 45)
+                  (cursor-value-set cursor "random number")
+                  (cursor-insert cursor)
+                  ;; test
+                  (cursor-key-set cursor 42)
+                  (with-cnx cnx
+                    (cursor-search-near cursor))))
+              0)
+
+  (test-check "record table, insert and retrieve key"
+              (let* ((cnx (connection-open "/tmp/wt" "create"))
+                     (session (session-open cnx)))
+                (session-create session "table:terms" "key_format=r,value_format=S")
+                (let ((cursor (cursor-open session "table:terms" "append")))
+                  (cursor-value-set cursor "timesink")
+                  (cursor-insert cursor)
+                  (with-cnx cnx (car (cursor-key-ref cursor)))))
+              1)
+  )
