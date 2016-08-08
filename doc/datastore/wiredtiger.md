@@ -1,6 +1,4 @@
-# Guile Wiredtiger
-
-## wiredtiger
+## Guile Wiredtiger
 
 Wiredtiger is a ordered key/value store written in C licensed gplv2 or gplv3.
 It's some what the successor of Oracle Berkeley Database (bsddb). It's similar
@@ -14,8 +12,7 @@ API. It's highly recommended to get started to have a look at
 [wiredtiger's schema](http://source.wiredtiger.com/2.6.1/schema.html)
 documentation.
 
-
-## Reference API
+### Reference API
 
 A lot of the API is available, what remains can be the subject of patches :)
 
@@ -26,14 +23,15 @@ too.
 They are three objects in guile-wiredtiger:
 
 - `<connection>` a repsent a particular connection to the wiredtiger engine.
-  ACID is not supported across several instance of  `<connection>`.
+ACID is not supported across several instance of  `<connection>`.
+
 - `<session>` has a `<connection>` as parent. It's not threadsafe.
+
 - `<cursor>` has a `<session>` as parent.
 
+#### <connection>
 
-### <connection>
-
-#### (connection-open home config) -> connection
+##### (connection-open home config) -> connection
 
 Open a connection to a database. Most applications will open a single connection
 to a database. A connection can be shared among several threads. There is no
@@ -41,27 +39,26 @@ support ACID transactions between several connections.
 
 Example:
 
-```scheme
+```
 (connection-open "./databases/magic-numbers" "create,cache_size=500M")
 ```
 
 `home` the path to the database home directory. The path must exists.
 
-#### (connection-close connection [config]) -> boolean
+##### (connection-close connection [config]) -> boolean
 
 Close connection. Any open sessions will be closed. config optional argument,
 that can be `leak_memory` to not free memory during close.
 
+#### <session>
 
-### <session>
-
-#### (session-open connection [config]) -> <session>
+##### (session-open connection [config]) -> <session>
 
 Open a session.
 
 Example:
 
-```scheme
+```
 (session-open connection "isolation=snapshot")
 ```
 
@@ -83,7 +80,7 @@ Example:
 
 If you don't know what you are doing, use `snapshot`.
 
-#### (session-close session)
+##### (session-close session)
 
 Close the session handle. This will release the resources associated with the
 session handle, including rolling back any active transactions and closing any
@@ -95,13 +92,13 @@ the thread and transactional context of the operation.
 Thread safety: A session is not usually shared between threads, see
 Multithreading for more information.
 
-#### (session-create session name config)
+##### (session-create session name config)
 
 Create a table, column group, index or file.
 
 Example:
 
-```scheme
+```
 (session-create session "table:magic-numbers" "key_format=i,value_format=S")
 ```
 
@@ -114,25 +111,24 @@ In guile-wiredtiger, `key_format` and `key_value` only support integral types
 `bBhHiIlLqQr` and variable length strings `S`. See format types for more
 information.
 
-#### (session-transaction-begin session [config])
+##### (session-transaction-begin session [config])
 
 Start a transaction.
 
-#### (session-transaction-commit session [config])
+##### (session-transaction-commit session [config])
 
 Commit the current transaction. A transaction must be in progress when this
 method is called. If sesssion-commit-transaction returns #f, the transaction
 was rolled back, not committed.
 
-#### (session-transaction-rollback session [config])
+##### (session-transaction-rollback session [config])
 
 Roll back the current transaction. A transaction must be in progress when this
 method is called. All cursors are reset.
 
+#### <cursor>
 
-### <cursor>
-
-#### (cursor-open session uri config) -> <cursor>
+##### (cursor-open session uri config) -> <cursor>
 
 Open a new cursor on a data source or duplicate an existing cursor.
 
@@ -155,7 +151,7 @@ types may have limited functionality (for example, they may be read-only
 or not support transactional updates). See **Data Sources** for more
 information.
 
-#### (cursor-key-set cursor . key)
+##### (cursor-key-set cursor . key)
 
 Set the key for the next operation. If an error occurs during this operation,
 a flag will be set in the cursor, and the next operation to access the value
@@ -163,7 +159,7 @@ will fail. This simplifies error handling in applications.
 
 `key` must consistent with the format of the current object key.
 
-#### (cursor-value-set cursor key)
+##### (cursor-value-set cursor key)
 
 Set the key for the next operation. If an error occurs during this operation,
 a flag will be set in the cursor, and the next operation to access the key will
@@ -171,33 +167,33 @@ fail. This simplifies error handling in applications.
 
 `key` must consistent with the format of the current object value.
 
-#### (cursor-key-ref cursor) -> list
+##### (cursor-key-ref cursor) -> list
 
 
 Get the key for the current record. The returned value is a bytevector that can
 be unpacked using the correct key format string of the associated object.
 
-#### (cursor-value-ref cursor) -> list
+##### (cursor-value-ref cursor) -> list
 
 Get the value for the current record. The returned value is a bytevector that
 can be unpacked using the correct key format string of the associated object.
 
-#### (cursor-next cursor) -> boolean
+##### (cursor-next cursor) -> boolean
 
 Move the cursor to the next record. Returns #f if there is no more records.
 
-#### (cursor-previous cursor) -> boolean
+##### (cursor-previous cursor) -> boolean
 
 Move the cursor to the previous record. Returns #f if there is no more records.
 
-#### (cursor-reset cursor) -> boolean
+##### (cursor-reset cursor) -> boolean
 
 Reset the position of the cursor. Any resources held by the cursor are released,
 and the cursor's key and position are no longer valid. A subsequent iteration
 with `cursor-next` will move to the first record, or with `cursor-prev` will
 move to the last record.
 
-#### (cursor-search cursor) -> boolean
+##### (cursor-search cursor) -> boolean
 
 On sucess move the cursor to the record matching the key. The key must first
 be set.
@@ -205,7 +201,7 @@ be set.
 To minimize cursor resources, the `cursor-reset` method should be called as soon
 as the record has been retrieved and the cursor no longer needs that position.
 
-#### (cursor-search-near cursor) -> -1, 0, 1 or #f
+##### (cursor-search-near cursor) -> -1, 0, 1 or #f
 
 Return the record matching the key if it exists, or an adjacent record.
 An adjacent record is either the smallest record larger than the key or the
@@ -216,7 +212,7 @@ On success, the cursor ends positioned at the returned record; to minimize
 cursor resources, the cursor-reset method should be called as soon as the record
 has been retrieved and the cursor no longer needs that position.
 
-#### (cursor-insert cursor) -> boolean
+##### (cursor-insert cursor) -> boolean
 
 Insert a record and optionally update an existing record.
 
@@ -246,7 +242,7 @@ The maximum length of a single column stored in a table is not fixed (as it
 partially depends on the underlying file configuration), but is always a small
 number of bytes less than 4GB.
 
-#### (cursor-update cursor) -> boolean
+##### (cursor-update cursor) -> boolean
 
 Update a record and optionally insert an existing record.
 
@@ -265,7 +261,7 @@ The maximum length of a single column stored in a table is not fixed (as it
 partially depends on the underlying file configuration), but is always a small
 number of bytes less than 4GB.
 
-#### (cursor-remove cursor) -> boolean
+##### (cursor-remove cursor) -> boolean
 
 Remove a record. The key must be set.
 
@@ -284,7 +280,7 @@ On success, the cursor ends positioned at the removed record; to minimize cursor
 resources, the cursor-reset method should be called as soon as the cursor no
 longer needs that position.
 
-#### (cursor-close cursor) -> boolean
+##### (cursor-close cursor) -> boolean
 
 Close the cursor. This releases the resources associated with the cursor handle.
 Cursors are closed implicitly by ending the enclosing connection or closing the

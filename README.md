@@ -15,7 +15,7 @@ interface for common tasks.
 
 ## Files
 
-Source files can be found in `culturia` directory.
+Source files can be found in `src` directory.
 Documentation can be found in `doc` directory.
 
 ## Contact

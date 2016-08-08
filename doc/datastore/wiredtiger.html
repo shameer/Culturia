@@ -1,0 +1,86 @@
+<html><head><meta charset="utf-8" /><title>guile-culturia</title><link rel="stylesheet" href="static/normalize.css" /><link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Gentium+Basic" /><link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Open+Sans" /><link rel="stylesheet" href="static/main.css" /></head><body><h1><a href="//hyperdev.fr/projects/culturia">hyperdev.fr/projects/culturia</a></h1><div id="container"><h2>Guile Wiredtiger</h2><p>Wiredtiger is a ordered key/value store written in C licensed gplv2 or gplv3.
+It&apos;s some what the successor of Oracle Berkeley Database (bsddb). It&apos;s similar
+in principles to leveldb but faster. It allows to build your own database
+easily.</p><p>It&apos;s a ACID, NoSQL, networkless, with automatic indices, multithread support.</p><p>Here follow the documentation of that module which follows closely wiredtiger
+API. It&apos;s highly recommended to get started to have a look at
+<a href="http://source.wiredtiger.com/2.6.1/schema.html">wiredtiger&apos;s schema</a>
+documentation.</p><h3>Reference API</h3><p>A lot of the API is available, what remains can be the subject of patches :)</p><p>The following documentation doesn&apos;t cover all of wiredtiger, it is best to have
+a look at <a href="http://source.wiredtiger.com/2.6.1/index.html">wiredtiger manual</a>
+too.</p><p>They are three objects in guile-wiredtiger:</p><p>- <code>&lt;connection&gt;</code> a repsent a particular connection to the wiredtiger engine.
+ACID is not supported across several instance of  <code>&lt;connection&gt;</code>.</p><p>- <code>&lt;session&gt;</code> has a <code>&lt;connection&gt;</code> as parent. It&apos;s not threadsafe.</p><p>- <code>&lt;cursor&gt;</code> has a <code>&lt;session&gt;</code> as parent.</p><h4>&lt;connection&gt;</h4><h5>(connection-open home config) -&gt; connection</h5><p>Open a connection to a database. Most applications will open a single connection
+to a database. A connection can be shared among several threads. There is no
+support ACID transactions between several connections.</p><p>Example:</p><pre>(connection-open &quot;./databases/magic-numbers&quot; &quot;create,cache_size=500M&quot;)</pre><p><code>home</code> the path to the database home directory. The path must exists.</p><h5>(connection-close connection [config]) -&gt; boolean</h5><p>Close connection. Any open sessions will be closed. config optional argument,
+that can be <code>leak_memory</code> to not free memory during close.</p><h4>&lt;session&gt;</h4><h5>(session-open connection [config]) -&gt; &lt;session&gt;</h5><p>Open a session.</p><p>Example:</p><pre>(session-open connection &quot;isolation=snapshot&quot;)</pre><p><code>config</code> configures isolation level:</p><p>- <code>read-uncommited</code> transactions can see changes made by other transactions
+  before those transactions are committed. Dirty reads, non-repeatable reads
+  and phantoms are possible.</p><p>- <code>read-commited</code> transactions cannot see changes made by other transactions
+  before those transactions are committed. Dirty reads are not possible;
+  non-repeatable reads and phantoms are possible. Committed changes from
+  concurrent transactions become visible when no cursor is positioned in the
+  read-committed transaction.</p><p>- <code>snapshot</code> transactions read the versions of records committed before the
+  transaction started. Dirty reads and non-repeatable reads are not possible;
+  phantoms are possible.</p><p>If you don&apos;t know what you are doing, use <code>snapshot</code>.</p><h5>(session-close session)</h5><p>Close the session handle. This will release the resources associated with the
+session handle, including rolling back any active transactions and closing any
+cursors that remain open in the session.</p><p>All data operations are performed in the context of a session. This encapsulates
+the thread and transactional context of the operation.</p><p>Thread safety: A session is not usually shared between threads, see
+Multithreading for more information.</p><h5>(session-create session name config)</h5><p>Create a table, column group, index or file.</p><p>Example:</p><pre>(session-create session &quot;table:magic-numbers&quot; &quot;key_format=i,value_format=S&quot;)</pre><p><code>name</code> the URI of the object to create, such as <code>&quot;table:stock&quot;</code>. For a
+description of URI formats see <b>Data Sources</b>.</p><p><code>config</code> configures the object.</p><p>In guile-wiredtiger, <code>key_format</code> and <code>key_value</code> only support integral types
+<code>bBhHiIlLqQr</code> and variable length strings <code>S</code>. See format types for more
+information.</p><h5>(session-transaction-begin session [config])</h5><p>Start a transaction.</p><h5>(session-transaction-commit session [config])</h5><p>Commit the current transaction. A transaction must be in progress when this
+method is called. If sesssion-commit-transaction returns <a class="hashtag" href="/hashtag/f">#f</a>, the transaction
+was rolled back, not committed.</p><h5>(session-transaction-rollback session [config])</h5><p>Roll back the current transaction. A transaction must be in progress when this
+method is called. All cursors are reset.</p><h4>&lt;cursor&gt;</h4><h5>(cursor-open session uri config) -&gt; &lt;cursor&gt;</h5><p>Open a new cursor on a data source or duplicate an existing cursor.</p><p>Cursor handles should be discarded by calling <code>cursor-close</code>.</p><p>Cursors capable of supporting transactional operations operate in the context
+of the current transaction, if any.</p><p><code>session-transaction-rollback</code> implicitly resets all cursors.</p><p>Cursors are relatively light-weight objects but may hold references to
+heavier-weight objects; applications should re-use cursors when possible,
+but instantiating new cursors is not so expensive that applications need
+to cache cursors at all cost.</p><p><code>uri</code> is the data source on which the cursor operates; cursors are usually
+opened on tables, however, cursors can be opened on any data source,
+regardless of whether it is ultimately stored in a table. Some cursor
+types may have limited functionality (for example, they may be read-only
+or not support transactional updates). See <b>Data Sources</b> for more
+information.</p><h5>(cursor-key-set cursor . key)</h5><p>Set the key for the next operation. If an error occurs during this operation,
+a flag will be set in the cursor, and the next operation to access the value
+will fail. This simplifies error handling in applications.</p><p><code>key</code> must consistent with the format of the current object key.</p><h5>(cursor-value-set cursor key)</h5><p>Set the key for the next operation. If an error occurs during this operation,
+a flag will be set in the cursor, and the next operation to access the key will
+fail. This simplifies error handling in applications.</p><p><code>key</code> must consistent with the format of the current object value.</p><h5>(cursor-key-ref cursor) -&gt; list</h5><p>
+Get the key for the current record. The returned value is a bytevector that can
+be unpacked using the correct key format string of the associated object.</p><h5>(cursor-value-ref cursor) -&gt; list</h5><p>Get the value for the current record. The returned value is a bytevector that
+can be unpacked using the correct key format string of the associated object.</p><h5>(cursor-next cursor) -&gt; boolean</h5><p>Move the cursor to the next record. Returns <a class="hashtag" href="/hashtag/f">#f</a> if there is no more records.</p><h5>(cursor-previous cursor) -&gt; boolean</h5><p>Move the cursor to the previous record. Returns <a class="hashtag" href="/hashtag/f">#f</a> if there is no more records.</p><h5>(cursor-reset cursor) -&gt; boolean</h5><p>Reset the position of the cursor. Any resources held by the cursor are released,
+and the cursor&apos;s key and position are no longer valid. A subsequent iteration
+with <code>cursor-next</code> will move to the first record, or with <code>cursor-prev</code> will
+move to the last record.</p><h5>(cursor-search cursor) -&gt; boolean</h5><p>On sucess move the cursor to the record matching the key. The key must first
+be set.</p><p>To minimize cursor resources, the <code>cursor-reset</code> method should be called as soon
+as the record has been retrieved and the cursor no longer needs that position.</p><h5>(cursor-search-near cursor) -&gt; -1, 0, 1 or <a class="hashtag" href="/hashtag/f">#f</a></h5><p>Return the record matching the key if it exists, or an adjacent record.
+An adjacent record is either the smallest record larger than the key or the
+largest record smaller than the key (in other words, a logically adjacent key).
+The key must first be set.</p><p>On success, the cursor ends positioned at the returned record; to minimize
+cursor resources, the cursor-reset method should be called as soon as the record
+has been retrieved and the cursor no longer needs that position.</p><h5>(cursor-insert cursor) -&gt; boolean</h5><p>Insert a record and optionally update an existing record.</p><p>If the cursor was configured with overwrite=true (the default), both the key
+and value must be set; if the record already exists, the key&apos;s value will be
+updated, otherwise, the record will be inserted.</p><p>If the cursor was configured with overwrite=false, both the key and value must
+be set and the record must not already exist; the record will be inserted.</p><p>If a cursor with record number keys was configured with append=true (not the
+default), the value must be set; a new record will be appended and the record
+number set as the cursor key value.</p><p>The cursor ends with no position, and a subsequent call to the cursor-next
+<code>cursor-prev</code> method will iterate from the beginning (end) of the table.</p><p>Inserting a new record after the current maximum record in a fixed-length bit
+field column-store (that is, a store with an r type key and t type value) may
+implicitly create the missing records as records with a value of 0.</p><p>When loading a large amount of data into a new object, using a cursor with the
+bulk configuration string enabled and loading the data in sorted order will be
+much faster than doing out-of-order inserts. See Bulk-load for more information.</p><p>The maximum length of a single column stored in a table is not fixed (as it
+partially depends on the underlying file configuration), but is always a small
+number of bytes less than 4GB.</p><h5>(cursor-update cursor) -&gt; boolean</h5><p>Update a record and optionally insert an existing record.</p><p>If the cursor was configured with overwrite=true (the default), both the key and
+value must be set; if the record already exists, the key&apos;s value will be
+updated, otherwise, the record will be inserted.</p><p>If the cursor was configured with overwrite=false, both the key and value must
+be set and the record must already existe; the record will be updated.</p><p>On success, the cursor ends positioned at the modified record; to minimize
+cursor resources, the cursor-reset method should be called as soon as the
+cursor no longer needs that position.</p><p>The maximum length of a single column stored in a table is not fixed (as it
+partially depends on the underlying file configuration), but is always a small
+number of bytes less than 4GB.</p><h5>(cursor-remove cursor) -&gt; boolean</h5><p>Remove a record. The key must be set.</p><p>If the cursor was configured with overwrite=true (the default), the key must be
+set; the key&apos;s record will be removed if it exists, no error will be returned if
+the record does not exist.</p><p>If the cursor was configured with overwrite=false, the key must be set and the
+key&apos;s record must exist; the record will be removed.</p><p>Removing a record in a fixed-length bit field column-store (that is, a store
+with an <code>r</code> type key and t type value) is identical to setting the record&apos;s
+value to 0.</p><p>On success, the cursor ends positioned at the removed record; to minimize cursor
+resources, the cursor-reset method should be called as soon as the cursor no
+longer needs that position.</p><h5>(cursor-close cursor) -&gt; boolean</h5><p>Close the cursor. This releases the resources associated with the cursor handle.
+Cursors are closed implicitly by ending the enclosing connection or closing the
+session in which they were opened.
+</p></div><p><small>cc-by-nc-sa</small></p></body></html>

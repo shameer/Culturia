@@ -1,14 +1,14 @@
-# graphitisay
+## graphitisay
 
 `graphitisay` is graph layer on top of wiredtiger. It's written in way
 where you have to know how wiredtiger works to be able to use, this is
-on purpose. It's away to make database paradigme composition using
-wiredtiger possible.
+on purpose.
 
-# `*graphitisay*`
+### `*graphitisay*`
 
 This defines the tables with indices used by graphitisay. You have to
 use it in places where `wiredtigerz` expects a list of configuration.
+
 For instance:
 
 ```
@@ -18,7 +18,7 @@ For instance:
 This will return two values, the `<connection>` used to create the
 database and a `<context>` (which can not be shared among threads).
 
-# Vertex
+### Vertex
 
 ```
 >>> (define-record-type* <vertex> uid label assoc)
@@ -49,20 +49,20 @@ And for incomings edges:
 
 - `(vertex-incomings/stream context uid)` returns a streams of incomings edges
 
-## `(vertex-ref context uid)`
+#### `(vertex-ref context uid)`
 
 Retrieve vertex with `UID` unique identifier and return a `<vertex>` record for it.
 
-## `(vertex-add context label assoc)`
+#### `(vertex-add context label assoc)`
 
 Create a new vertex with `LABEL` and `ASSOC` in the database and
 return its unique identifier.
 
-## `(vertex-save context vertex)`
+#### `(vertex-save context vertex)`
 
 Persist to disk `VERTEX` attributes.
 
-# Edge
+### Edge
 
 ```
 (define-record-type* <edge> uid start label end assoc)
@@ -72,20 +72,24 @@ Edge record holds most often accessed data. You can use the
 following procedures to access its attributes:
 
 - `edge-uid`
+
 - `edge-start` returns the vertex's uid where the edge starts 
+
 - `edge-label`
+
 - `edge-end` returns the vertex's uid where the edge ends
+
 - `edge-assoc`
 
-## `(edge-ref context uid)`
+#### `(edge-ref context uid)`
 
 Retrieve the edge with `UID` as unique identifier.
 
-## `(edge-add context start label end assoc)`
+#### `(edge-add context start label end assoc)`
 
 Create an edge with `START`, `LABEL`, `END` and `ASSOC` and return its
 unique identifier.
 
-## `(edge-save context edge)`
+#### `(edge-save context edge)`
 
 Persist to disk `EDGE` attributes.
