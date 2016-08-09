@@ -155,6 +155,7 @@
   (assoc-ref '((record . "r")
                (string . "S")
                (unsigned-integer . "Q")
+               (positive-integer . "Q")
                (integer . "q")
                (raw . "u"))
              symbol))
@@ -326,15 +327,6 @@ a two values: the connection and a context"
 
 (export with-transaction)
 
-(define-syntax-rule (call-with-cursor context name proc)
-  (let ((cursor (context-ref context name)))
-    (let ((out (apply proc cursor)))
-        (cursor-reset cursor)
-        out)))
-      
-
-(export call-with-cursor)
-
 ;;;
 ;;; Cursor navigation
 ;;;
@@ -350,6 +342,16 @@ a two values: the connection and a context"
     out))
 
 (export with-cursor)
+
+(define-syntax-rule (call-with-cursor context name proc)
+  (let* ( (cursor (context-ref context name)))
+    (let ((out (proc cursor)))
+      (cursor-reset cursor)
+        out)))
+
+
+(export call-with-cursor)
+
 
 (define-public (cursor-next* cursor)
   "Move the cursor to the next result and return #t.
@@ -607,8 +609,7 @@ if KEY is not found"
         (wiredtiger-open* "/tmp/wt"
                           '(terms ((key . record)) ((value . unsigned-integer)) ()))
       (with-cnx cnx
-        (let ((append (context-ref ctx 'terms-append))
-              (another (cursor-open (context-session ctx) "table:terms" "append")))
+        (let ((append (context-ref ctx 'terms-append)))
           (cursor-insert* append #nil (list 42))
           (cursor-insert* append #nil (list 1337))
           (cursor-insert* append #nil (list 1985)))))
@@ -649,8 +650,8 @@ if KEY is not found"
     (receive (cnx ctx) (wiredtiger-open* "/tmp/wt" '(table ((k . record))
                                                            ((v . integer))
                                                            ((reversed (v) (k)))))
-      (cursor-insert* (context-ref ctx 'table-append) #nil '(1)) 
-      (cursor-insert* (context-ref ctx 'table-append) #nil '(42))     
+      (cursor-insert* (context-ref ctx 'table-append) #nil '(1))
+      (cursor-insert* (context-ref ctx 'table-append) #nil '(42))
       (cursor-insert* (context-ref ctx 'table-append) #nil '(1))
       (with-cnx cnx
         (cursor-range (context-ref ctx 'table-reversed) 42)))
