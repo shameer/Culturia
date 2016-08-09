@@ -1,0 +1,1 @@
+- improve connection-add-collator to use scheme spec instead of wt columns strings
