@@ -4,7 +4,7 @@
 where you have to know how wiredtiger works to be able to use, this is
 on purpose.
 
-### `*graphitisay*`
+### *graphitisay*
 
 This defines the tables with indices used by graphitisay. You have to
 use it in places where `wiredtigerz` expects a list of configuration.
@@ -12,7 +12,7 @@ use it in places where `wiredtigerz` expects a list of configuration.
 For instance:
 
 ```
->>> (apply wiredtiger-open* (cons "/tmp" *graphitisay*")
+>>> (apply wiredtiger-open* (cons "/tmp" *graphitisay*"))
 ```
 
 This will return two values, the `<connection>` used to create the
@@ -40,25 +40,21 @@ To retrieve outgoings edges use the following procedures:
 - `(vertex-outgoings context uid)` returns the list of outgoings edges ie.
   edges that starts at the vertex with `UID` as identifier.
 
-- `(vertex-outgoings/stream context uid)` returns a streams of outgoings edges
-
 And for incomings edges:
 
 - `(vertex-incomings context uid)` returns the list of incomings edges ie.
   edges that starts at the vertex with `UID` as identifier.
 
-- `(vertex-incomings/stream context uid)` returns a streams of incomings edges
-
-#### `(vertex-ref context uid)`
+#### (vertex-ref context uid)
 
 Retrieve vertex with `UID` unique identifier and return a `<vertex>` record for it.
 
-#### `(vertex-add context label assoc)`
+#### (vertex-add context label assoc)
 
 Create a new vertex with `LABEL` and `ASSOC` in the database and
 return its unique identifier.
 
-#### `(vertex-save context vertex)`
+#### (vertex-save context vertex)
 
 Persist to disk `VERTEX` attributes.
 
@@ -81,15 +77,15 @@ following procedures to access its attributes:
 
 - `edge-assoc`
 
-#### `(edge-ref context uid)`
+#### (edge-ref context uid)
 
 Retrieve the edge with `UID` as unique identifier.
 
-#### `(edge-add context start label end assoc)`
+#### (edge-add context start label end assoc)
 
 Create an edge with `START`, `LABEL`, `END` and `ASSOC` and return its
 unique identifier.
 
-#### `(edge-save context edge)`
+#### (edge-save context edge)
 
 Persist to disk `EDGE` attributes.
