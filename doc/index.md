@@ -25,7 +25,7 @@ Culturia is a reference to
 
 ## Where do we go from here?
 
-- [datastore documentation](datastore/)
+- [datastore documentation](datastore.html)
 
 - [roadmap](roadmap.html)
 

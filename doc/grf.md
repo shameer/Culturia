@@ -1,18 +1,18 @@
-## graphitisay
+## grf
 
-`graphitisay` is graph layer on top of wiredtiger. It's written in way
+`grf` is graph layer on top of wiredtiger. It's written in way
 where you have to know how wiredtiger works to be able to use, this is
 on purpose.
 
-### *graphitisay*
+### *grf*
 
-This defines the tables with indices used by graphitisay. You have to
+This defines the tables with indices used by grf. You have to
 use it in places where `wiredtigerz` expects a list of configuration.
 
 For instance:
 
 ```
->>> (apply wiredtiger-open* (cons "/tmp" *graphitisay*"))
+>>> (apply wiredtiger-open* (cons "/tmp" *grf*"))
 ```
 
 This will return two values, the `<connection>` used to create the
