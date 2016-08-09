@@ -326,6 +326,15 @@ a two values: the connection and a context"
 
 (export with-transaction)
 
+(define-syntax-rule (call-with-cursor context name proc)
+  (let ((cursor (context-ref context name)))
+    (let ((out (apply proc cursor)))
+        (cursor-reset cursor)
+        out)))
+      
+
+(export call-with-cursor)
+
 ;;;
 ;;; Cursor navigation
 ;;;
