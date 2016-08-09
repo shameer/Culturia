@@ -158,6 +158,24 @@
            ;; FIXME: add support for error_handler
       (check (function (*connection-pointer connection) config)))))
 
+(define (make-collator proc)
+  (lambda (collator session-pointer key other cmp)
+    (catch #true
+      (lambda () (let* ((session (make make-*session session-pointer 26))
+                        (out (proc session key other)))
+                   (s32vector-set! cmp 0 out)
+                   0)
+      (lambda () 1)))))
+  
+(define-public (connection-add-collator connection name proc)
+  "add PROC as a collator named NAME against CONNECTION"
+  (let* ((function (pointer->procedure* int (*connection-collator connection) '* '* '* '*))
+         (collator (pointer-address (procedure->pointer (make-collator proc) int '* '* '* '* '*)))
+         (collator (u64vector collator 0 0))
+    (check (function (*connection-pointer connection)
+                     (string->pointer name)
+                     collator
+                     NULL)))))
 
 ;;;
 ;;; Session
@@ -217,7 +235,7 @@
            ;; call the foreign function
            ;; FIXME: add support for error_handler
            (code (function (*connection-pointer connection) NULL config double-pointer)))
-      (check  code)
+      (check code)
       (make make-*session pointer 26))))
 
 (define-public (session-create session name config)
