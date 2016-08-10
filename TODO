@@ -1,1 +1,5 @@
-- improve connection-add-collator to use scheme spec instead of wt columns strings
+* wiredtiger: improve connection-add-collator to use scheme spec
+  instead of wt columns strings
+
+* wiredtiger: add join support
+  cf. http://source.wiredtiger.com/develop/cursor_join.html
