@@ -147,3 +147,12 @@ hackernews and wikipedia at least.
 The next step will be to port whoosh/lucene to guile.
 
 Then I will restart thinking.
+
+#### 2016/08/xx - Quietly Confident
+
+- wiredtiger: add collator support
+
+- wiredtiger: I wanted to add indices to graphitisay that keeps
+lexicographic order. Collator is one solution, the other solution is
+to develop something like bytekey and bytewise. I figured that it is
+not useful for my immediate needs.
