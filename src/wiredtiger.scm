@@ -1,4 +1,4 @@
-;; guile-wiredtiger - 0.4 - 2016/08/10
+;; guile-wiredtiger - 0.4 - 2016/07/07
 
 ;; Copyright © 2014-2016 Amirouche BOUBEKKI <amirouche at hypermove net>
 
@@ -659,70 +659,70 @@ NULL))))
                   (with-cnx cnx (car (cursor-key-ref cursor)))))
               1)
 
-  (test-check "create table with scheme collator"
-    (receive (cnx ctx) (wiredtiger-open* "/tmp/wt" '(table
-                                                     ((key . record))
-                                                     ((scheme . string))
-                                                     ((reversed (scheme) (key)))))
+  ;; (test-check "create table with scheme collator"
+  ;;   (receive (cnx ctx) (wiredtiger-open* "/tmp/wt" '(table
+  ;;                                                    ((key . record))
+  ;;                                                    ((scheme . string))
+  ;;                                                    ((reversed (scheme) (key)))))
 
-      (connection-add-collator cnx "ci" "Sr" (lambda (key other)
-                                               (if (string=? (car key) (car other))
-                                                   0
-                                                   (if (string-ci<? (car key) (car other)) -1 1))))
-      (session-create session "table:terms" "key_format=r,value_format=S,columns=(a,b)")
-      (session-create session "index:terms:reversed" "columns=(b),collator=ci")
+  ;;     (connection-add-collator cnx "ci" "Sr" (lambda (key other)
+  ;;                                              (if (string=? (car key) (car other))
+  ;;                                                  0
+  ;;                                                  (if (string-ci<? (car key) (car other)) -1 1))))
+  ;;     (session-create session "table:terms" "key_format=r,value_format=S,columns=(a,b)")
+  ;;     (session-create session "index:terms:reversed" "columns=(b),collator=ci")
 
-      (let ((cursor (cursor-open session "table:terms" "append")))
-        (cursor-value-set cursor "a")
-        (cursor-insert cursor)
-        (cursor-value-set cursor "A")
-        (cursor-insert cursor)
-        (cursor-value-set cursor "b")
-        (cursor-insert cursor)
-        (cursor-value-set cursor "B")
-        (cursor-insert cursor))
+  ;;     (let ((cursor (cursor-open session "table:terms" "append")))
+  ;;       (cursor-value-set cursor "a")
+  ;;       (cursor-insert cursor)
+  ;;       (cursor-value-set cursor "A")
+  ;;       (cursor-insert cursor)
+  ;;       (cursor-value-set cursor "b")
+  ;;       (cursor-insert cursor)
+  ;;       (cursor-value-set cursor "B")
+  ;;       (cursor-insert cursor))
 
-      (let ((cursor (cursor-open session "index:terms:reversed")))
-        (with-cnx cnx
-          (let loop ((next? (cursor-next cursor))
-                     (out '()))
-            (if next?
-                (let ((key (cursor-key-ref cursor)))
-                  (loop (catch 'wiredtiger
-                          (lambda () (cursor-next cursor) #true)
-                          (lambda ignore #false))
-                        (cons key out)))
-                out)))))
-    '(("B") ("b") ("A") ("a")))
-  (test-check "create table with collator"
-    (let* ((cnx (connection-open "/tmp/wt" "create"))
-           (session (session-open cnx)))
-      (connection-add-collator cnx "ci" "Sr" (lambda (key other)
-                                               (if (string=? (car key) (car other))
-                                                   0
-                                                   (if (string-ci<? (car key) (car other)) -1 1))))
-      (session-create session "table:terms" "key_format=r,value_format=S,columns=(a,b)")
-      (session-create session "index:terms:reversed" "columns=(b),collator=ci")
+  ;;     (let ((cursor (cursor-open session "index:terms:reversed")))
+  ;;       (with-cnx cnx
+  ;;         (let loop ((next? (cursor-next cursor))
+  ;;                    (out '()))
+  ;;           (if next?
+  ;;               (let ((key (cursor-key-ref cursor)))
+  ;;                 (loop (catch 'wiredtiger
+  ;;                         (lambda () (cursor-next cursor) #true)
+  ;;                         (lambda ignore #false))
+  ;;                       (cons key out)))
+  ;;               out)))))
+  ;;   '(("B") ("b") ("A") ("a")))
+  ;; (test-check "create table with collator"
+  ;;   (let* ((cnx (connection-open "/tmp/wt" "create"))
+  ;;          (session (session-open cnx)))
+  ;;     (connection-add-collator cnx "ci" "Sr" (lambda (key other)
+  ;;                                              (if (string=? (car key) (car other))
+  ;;                                                  0
+  ;;                                                  (if (string-ci<? (car key) (car other)) -1 1))))
+  ;;     (session-create session "table:terms" "key_format=r,value_format=S,columns=(a,b)")
+  ;;     (session-create session "index:terms:reversed" "columns=(b),collator=ci")
 
-      (let ((cursor (cursor-open session "table:terms" "append")))
-        (cursor-value-set cursor "a")
-        (cursor-insert cursor)
-        (cursor-value-set cursor "A")
-        (cursor-insert cursor)
-        (cursor-value-set cursor "b")
-        (cursor-insert cursor)
-        (cursor-value-set cursor "B")
-        (cursor-insert cursor))
-      (let ((cursor (cursor-open session "index:terms:reversed")))
-        (with-cnx cnx
-          (let loop ((next? (cursor-next cursor))
-                     (out '()))
-            (if next?
-                (let ((key (cursor-key-ref cursor)))
-                  (loop (catch 'wiredtiger
-                          (lambda () (cursor-next cursor) #true)
-                          (lambda ignore #false))
-                        (cons key out)))
-                out)))))
-    '(("B") ("b") ("A") ("a")))
+  ;;     (let ((cursor (cursor-open session "table:terms" "append")))
+  ;;       (cursor-value-set cursor "a")
+  ;;       (cursor-insert cursor)
+  ;;       (cursor-value-set cursor "A")
+  ;;       (cursor-insert cursor)
+  ;;       (cursor-value-set cursor "b")
+  ;;       (cursor-insert cursor)
+  ;;       (cursor-value-set cursor "B")
+  ;;       (cursor-insert cursor))
+  ;;     (let ((cursor (cursor-open session "index:terms:reversed")))
+  ;;       (with-cnx cnx
+  ;;         (let loop ((next? (cursor-next cursor))
+  ;;                    (out '()))
+  ;;           (if next?
+  ;;               (let ((key (cursor-key-ref cursor)))
+  ;;                 (loop (catch 'wiredtiger
+  ;;                         (lambda () (cursor-next cursor) #true)
+  ;;                         (lambda ignore #false))
+  ;;                       (cons key out)))
+  ;;               out)))))
+  ;;   '(("B") ("b") ("A") ("a")))
   )
