@@ -23,6 +23,7 @@
 
 ;; (use-modules (ice-9 optargs))  ;; define*
 (use-modules (ice-9 match))
+(use-modules (ice-9 receive))
 
 (use-modules (wiredtiger))
 (use-modules (wiredtigerz))
@@ -75,6 +76,11 @@
                         ((label . string)
                          (assoc . string))
                         ((label (label) (uid))))
+                       (vertex-index
+                        ((uid . unsigned-integer)
+                         (key . string))
+                        ((value . string))
+                        ((avu (key value) (uid))))
                        (edge
                         ((uid . record))
                         ((start . unsigned-integer)
@@ -83,13 +89,45 @@
                          (assoc . string))
                         ((label (label) (uid))
                          (outgoings (start) (uid))
-                         (incomings (end) (uid))))))
+                         (incomings (end) (uid))))
+                       (edge-index
+                        ((uid . unsigned-integer)
+                         (key . string))
+                        ((value . string))
+                        ((avu (key value) (uid))))))
+
+;;; vertex-index and edge-index helpers
+
+(define (index-insert! cursor uid assoc)
+  (let loop ((assoc assoc))
+    (unless (null? assoc)
+      (cursor-insert* cursor (list uid (symbol->string (caar assoc))) (list (scm->string (cdar assoc))))
+      (loop (cdr assoc)))))
+
+(define (assoc-diff old new)
+  (values (lset-difference eq? (map car new) (map car old)) ; added
+          (lset-difference equal? new (lset-intersection equal? new old)) ; updated
+          (lset-difference eq? (map car old) (map car new)))) ; deleted
+
+(define (index-update! cursor uid old new)
+  (receive (added updated deleted) (assoc-diff old new)
+    (index-insert! cursor uid added)
+    (let update ((updated updated))
+      (unless (null? updated)
+        (cursor-update* cursor
+                        (list uid (symbol->string (caar updated)))
+                        (list (scm->string (cdar updated))))
+        (update (cdr updated))))
+    (let delete ((deleted deleted))
+      (unless (null? deleted)
+        (cursor-remove* cursor uid (symbol->string (car deleted)))
+        (delete (cdr deleted))))))
 
 ;;;
 ;;; Vertex
 ;;;
 
-(define-record-type* <vertex> uid label assoc)
+(define-record-type* <vertex> uid label assoc initial-assoc)
 
 (export vertex-uid vertex-assoc)
 
@@ -104,16 +142,23 @@
   (let ((cursor (context-ref context 'vertex)))
     (match (cursor-value-ref* cursor uid)
       (() (throw 'vertex-not-found uid))
-      ((label assoc) (make-vertex uid label (string->scm assoc))))))
+      ((label assoc)
+       (let ((assoc (string->scm assoc)))
+         (make-vertex uid label assoc assoc))))))
 
 (define-public (vertex-label? edge label)
   (equal? (vertex-label edge) label))
 
 (define-public (vertex-add! context label assoc)
-  (let ((cursor (context-ref context 'vertex-append)))
-    (cursor-insert* cursor #nil (list label (scm->string assoc)))))
+  (let ((uid (call-with-cursor context 'vertex-append
+               (lambda (cursor)
+                 (cursor-insert* cursor '() (list label (scm->string assoc)))))))
+    (call-with-cursor context 'vertex-index
+      (lambda (cursor)
+        (index-insert! cursor uid assoc)))
+    (make-vertex uid label assoc assoc)))
 
-(define-public (vertex-assoc-update vertex key value)
+(define-public (vertex-assoc-set vertex key value)
   (let* ((assoc (vertex-assoc vertex))
          (assoc (acons key value (alist-delete key assoc))))
     (set-field vertex (vertex-assoc) assoc)))
@@ -122,10 +167,14 @@
   (assoc-ref (vertex-assoc vertex) key))
 
 (define-public (vertex-save! context vertex)
-  (let ((cursor (context-ref context 'vertex)))
-    (cursor-update* cursor
-                    (list (vertex-uid vertex))
-                    (list (vertex-label vertex) (scm->string (vertex-assoc vertex))))))
+  (call-with-cursor context 'vertex
+    (lambda (cursor)
+      (cursor-update* cursor
+                      (list (vertex-uid vertex))
+                      (list (vertex-label vertex) (scm->string (vertex-assoc vertex))))))
+  (call-with-cursor context 'vertex-index
+    (lambda (cursor)
+      (index-update! cursor (vertex-uid vertex) (vertex-initial-assoc vertex) (vertex-assoc vertex)))))
 
 (define-public (vertex-outgoings context uid)
   (let ((cursor (context-ref context 'edge-outgoings)))
@@ -143,7 +192,7 @@
 ;;; Edge
 ;;;
 
-(define-record-type* <edge> uid start label end assoc)
+(define-record-type* <edge> uid start label end assoc initial-assoc)
 
 (export edge-uid edge-start edge-label edge-end edge-assoc)
 
@@ -160,14 +209,21 @@
   (let ((cursor (context-ref context 'edge)))
     (match (cursor-value-ref* cursor uid)
       (() (throw 'edge-not-found uid))
-      ((start label end assoc) (make-edge uid start label end (string->scm assoc))))))
+      ((start label end assoc)
+       (let ((assco (string->scm assoc)))
+         (make-edge uid start label end assoc assoc))))))
 
 (define-public (edge-label? edge label)
   (equal? (edge-label edge) label))
 
 (define-public (edge-add! context start label end assoc)
-  (let ((cursor (context-ref context 'edge-append)))
-    (cursor-insert* cursor #nil (list start label end (scm->string assoc)))))
+  (let ((uid (call-with-cursor context 'edge-append
+               (lambda (cursor)
+                 (cursor-insert* cursor #nil (list start label end (scm->string assoc)))))))
+    (call-with-cursor context 'vertex-index
+      (lambda (cursor)
+        (index-insert! cursor uid assoc)))
+    (make-edge uid start label end assoc assoc)))
 
 (define-public (edge-assoc-update edge key value)
   (let* ((assoc (edge-assoc edge))
@@ -178,125 +234,57 @@
   (assoc-ref (edge-assoc edge) key))
 
 (define-public (edge-save! context edge)
-  (let ((cursor (context-ref context 'edge)))
-    (cursor-update* cursor
-                    (list (edge-uid edge))
-                    (list (edge-start edge)
-                          (edge-label edge)
-                          (edge-end edge)
-                          (scm->string (edge-assoc edge))))))
+  (call-with-cursor context 'edge
+    (lambda (cursor)
+      (cursor-update* cursor
+                      (list (edge-uid edge))
+                      (list (edge-start edge)
+                            (edge-label edge)
+                            (edge-end edge)
+                            (scm->string (edge-assoc edge))))))
+  (call-with-cursor context 'edge-index
+    (lambda (cursor)
+      (index-update! cursor (edge-uid edge) (edge-initial-assoc edge) (edge-assoc edge)))))
 
 (define-public (edge-with-label context label)
   (let ((cursor (context-ref context 'edge-label)))
     (map cadr (cursor-range cursor label))))
 
 ;;;
-;;; test-check
+;;; tests
 ;;;
 
-(use-modules (ice-9 receive))
-
-
-(define-syntax test-check
-  (syntax-rules ()
-    ((_ title tested-expression expected-result)
-     (begin
-       (format #t "** Checking ~s\n" title)
-       (let* ((expected expected-result)
-              (produced tested-expression))
-         (if (not (equal? expected produced))
-             (begin (format #t "*** Expected: ~s\n" expected)
-                    (format #t "*** Computed: ~s\n" produced))))))))
-
-
-(define (path-join . rest)
-  "Return the absolute path made of REST. If the first item
-   of REST is not absolute the current working directory
-   will be prepend"
-  (let ((path (string-join rest "/")))
-    (if (string-prefix? "/" path)
-        path
-        (string-append (getcwd) "/" path))))
-
-
-(define (path-dfs-walk dirpath proc)
-  (define dir (opendir dirpath))
-  (let loop ()
-    (let ((entry (readdir dir)))
-      (cond
-       ((eof-object? entry))
-       ((or (equal? entry ".") (equal? entry "..")) (loop))
-       (else (let ((path (path-join dirpath entry)))
-               (if (equal? (stat:type (stat path)) 'directory)
-                   (begin (path-dfs-walk path proc)
-                          (proc path))
-                   (begin (proc path) (loop))))))))
-  (closedir dir)
-  (proc (path-join dirpath)))
-
-
-(define (rmtree path)
-  (path-dfs-walk path (lambda (path)
-                        (if (equal? (stat:type (stat path)) 'directory)
-                            (rmdir path)
-                            (delete-file path)))))
-
-
-(define-syntax-rule (with-directory path e ...)
-  (begin
-    (when (access? path F_OK)
-      (rmtree path))
-    (mkdir path)
-    e ...
-    (rmtree path)))
-
+(use-modules (test-check))
 
 (when (or (getenv "CHECK") (getenv "CHECK_GRF"))
   (format #t "* Testing grf\n")
-  (with-directory "/tmp/grf"
-                  (receive (cnx context) (apply wiredtiger-open* (cons "/tmp/grf" *grf*))
-                    (test-check "wiredtiger-open*"
-                                cnx
-                                cnx)
-                    (connection-close cnx)))
 
-  ;;; basic vertex
+  (test-check "wiredtigerz"
+    (receive (cnx context) (apply wiredtiger-open* (cons "/tmp/wt" *grf*))
+      (with-cnx cnx
+        #true))
+    #true)
 
-  (with-directory "/tmp/grf"
-                  (receive (cnx context) (apply wiredtiger-open* (cons "/tmp/grf" *grf*))
-                    (test-check "vertex-add!"
-                                (vertex-add! context "test" 42)
-                                1)
-                    (connection-close cnx)))
+  (test-check "vertex-add!"
+    (receive (cnx context) (apply wiredtiger-open* (cons "/tmp/wt" *grf*))
+      (with-cnx cnx
+        (vertex-uid (vertex-add! context "test" '((a . 42))))))
+        1)
 
-  (with-directory "/tmp/grf"
-                  (receive (cnx context) (apply wiredtiger-open* (cons "/tmp/grf" *grf*))
-                    (test-check "vertex-ref"
-                                (let ((uid (vertex-add! context "test" 42)))
-                                  (vertex-assoc (vertex-ref context uid)))
-                                  42)
-                    (connection-close cnx)))
+  (test-check "vertex-ref"
+    (receive (cnx context) (apply wiredtiger-open* (cons "/tmp/wt" *grf*))
+      (let ((vertex (vertex-add! context "test" '((a . 42)))))
+        (with-cnx cnx
+          (vertex-assoc (vertex-ref context (vertex-uid vertex))))))
+      '((a . 42)))
 
-  (with-directory "/tmp/grf"
-                  (receive (cnx context) (apply wiredtiger-open* (cons "/tmp/grf" *grf*))
-                    (test-check "vertex-save!"
-                                (let* ((uid (vertex-add! context "test" 42))
-                                       (vertex (set-field (vertex-ref context uid) (vertex-assoc) 666)))
-                                  (vertex-save! context vertex)
-                                  (vertex-assoc (vertex-ref context uid)))
-                                666)
-                    (connection-close cnx)))
+  (test-check "vertex-save!"
+    (receive (cnx context) (apply wiredtiger-open* (cons "/tmp/wt" *grf*))
+      (let* ((vertex (vertex-add! context "test" '((a . 42))))
+             (vertex (vertex-assoc-set vertex 'a 666)))
+        (vertex-save! context vertex)
+        (with-cnx cnx
+          (vertex-assoc-ref (vertex-ref context (vertex-uid vertex)) 'a))))
+      666)
+  )
 
-  ;;; do it all test
-
-  (with-directory "/tmp/grf"
-                  (receive (cnx context) (apply wiredtiger-open* (cons "/tmp/grf" *grf*))
-                    (test-check "do it all!"
-                                (let* ((start (vertex-add! context "test" "start"))
-                                       (end (vertex-add! context "test" "end"))
-                                       (uid (edge-add! context start "test" end 2006))
-                                       (uid (edge-add! context end "test" start 3600)))
-                                  (append (vertex-incomings context start)
-                                          (vertex-outgoings context end)))
-                                '(2 2))
-                    (connection-close cnx))))
