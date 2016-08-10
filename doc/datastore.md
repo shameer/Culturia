@@ -11,4 +11,6 @@ Have a look at:
 
 - [wiredtigerz](wiredtigerz.html)
 
-- [grf](grf.html)
+- [grf](grf.html) a graph database
+
+- [uav](uav.html) a tuple space with sparql-like querying

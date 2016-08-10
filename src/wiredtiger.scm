@@ -1,4 +1,4 @@
-;; guile-wiredtiger - 0.4 - 2016/07/07
+;; guile-wiredtiger - 0.4 - 2016/08/10
 
 ;; Copyright © 2014-2016 Amirouche BOUBEKKI <amirouche at hypermove net>
 
