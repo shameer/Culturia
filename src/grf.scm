@@ -71,19 +71,19 @@
 ;;;
 
 (define-public *grf* '((vertex
-                                ((uid . record))
-                                ((label . string)
-                                 (assoc . string))
-                                ((label (label) (uid))))
-                               (edge
-                                ((uid . record))
-                                ((start . unsigned-integer)
-                                 (label . string)
-                                 (end . unsigned-integer)
-                                 (assoc . string))
-                                ((label (label) (uid))
-                                 (outgoings (start) (uid))
-                                 (incomings (end) (uid))))))
+                        ((uid . record))
+                        ((label . string)
+                         (assoc . string))
+                        ((label (label) (uid))))
+                       (edge
+                        ((uid . record))
+                        ((start . unsigned-integer)
+                         (label . string)
+                         (end . unsigned-integer)
+                         (assoc . string))
+                        ((label (label) (uid))
+                         (outgoings (start) (uid))
+                         (incomings (end) (uid))))))
 
 ;;;
 ;;; Vertex
