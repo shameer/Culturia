@@ -158,4 +158,4 @@ to develop something like bytekey and bytewise. I figured that it is
 not useful for my immediate needs.
 
 - ipd: add priority queue table, this is meant to be mixed with
-  with guile fiber somehow.
+  with guile fiber somehow 
