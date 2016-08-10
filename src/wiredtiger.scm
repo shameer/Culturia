@@ -105,6 +105,14 @@
   (unless (eq? code 0)
     (throw 'wiredtiger (wiredtiger-string-error code))))
 
+(define (wiredtiger-struct-unpack session buffer size format)
+  (let* ((args (map (lambda _ (u64vector 0)) (string->list format)))
+                 (args* (map bytevector->pointer args))
+                 (signature (map (lambda _ POINTER) args*))
+                 (function (apply wiredtiger (cons* int "wiredtiger_struct_unpack" '* '* size_t '* signature))))
+        (apply function (cons* session (make-pointer buffer) size (string->pointer format) args*))
+(pointers->scm format args)))
+
 ;;;
 ;;; Connection
 ;;;
@@ -158,6 +166,24 @@
            ;; FIXME: add support for error_handler
       (check (function (*connection-pointer connection) config)))))
 
+(define (make-collator format proc)
+  (lambda (collator session key other cmp)
+        (let* ((key (pointer->bytevector key 2 0 'u64))
+                   (key (wiredtiger-struct-unpack session (array-ref key 0) (array-ref key 1) format)))
+          (let* ((other (pointer->bytevector other 2 0 'u64))
+                         (other (wiredtiger-struct-unpack session (array-ref other 0) (array-ref other 1) format)))
+                        (s32vector-set! (pointer->bytevector cmp 1 0 's32) 0 (proc key other))
+                        0))))
+
+(define-public (connection-add-collator connection name format proc)
+  "add PROC as a collator named NAME against CONNECTION"
+  (let* ((function (pointer->procedure* int (*connection-add-collator connection) '* '* '* '*))
+                 (collator (pointer-address (procedure->pointer int (make-collator format proc) (list '* '* '* '* '*))))
+                 (collator (bytevector->pointer (u64vector collator 0 0))))
+        (check (function (*connection-pointer connection)
+                                         (string->pointer name)
+                                         collator
+NULL))))
 
 ;;;
 ;;; Session
@@ -632,4 +658,71 @@
                   (cursor-insert cursor)
                   (with-cnx cnx (car (cursor-key-ref cursor)))))
               1)
+
+  (test-check "create table with scheme collator"
+    (receive (cnx ctx) (wiredtiger-open* "/tmp/wt" '(table
+                                                     ((key . record))
+                                                     ((scheme . string))
+                                                     ((reversed (scheme) (key)))))
+
+      (connection-add-collator cnx "ci" "Sr" (lambda (key other)
+                                               (if (string=? (car key) (car other))
+                                                   0
+                                                   (if (string-ci<? (car key) (car other)) -1 1))))
+      (session-create session "table:terms" "key_format=r,value_format=S,columns=(a,b)")
+      (session-create session "index:terms:reversed" "columns=(b),collator=ci")
+
+      (let ((cursor (cursor-open session "table:terms" "append")))
+        (cursor-value-set cursor "a")
+        (cursor-insert cursor)
+        (cursor-value-set cursor "A")
+        (cursor-insert cursor)
+        (cursor-value-set cursor "b")
+        (cursor-insert cursor)
+        (cursor-value-set cursor "B")
+        (cursor-insert cursor))
+
+      (let ((cursor (cursor-open session "index:terms:reversed")))
+        (with-cnx cnx
+          (let loop ((next? (cursor-next cursor))
+                     (out '()))
+            (if next?
+                (let ((key (cursor-key-ref cursor)))
+                  (loop (catch 'wiredtiger
+                          (lambda () (cursor-next cursor) #true)
+                          (lambda ignore #false))
+                        (cons key out)))
+                out)))))
+    '(("B") ("b") ("A") ("a")))
+  (test-check "create table with collator"
+    (let* ((cnx (connection-open "/tmp/wt" "create"))
+           (session (session-open cnx)))
+      (connection-add-collator cnx "ci" "Sr" (lambda (key other)
+                                               (if (string=? (car key) (car other))
+                                                   0
+                                                   (if (string-ci<? (car key) (car other)) -1 1))))
+      (session-create session "table:terms" "key_format=r,value_format=S,columns=(a,b)")
+      (session-create session "index:terms:reversed" "columns=(b),collator=ci")
+
+      (let ((cursor (cursor-open session "table:terms" "append")))
+        (cursor-value-set cursor "a")
+        (cursor-insert cursor)
+        (cursor-value-set cursor "A")
+        (cursor-insert cursor)
+        (cursor-value-set cursor "b")
+        (cursor-insert cursor)
+        (cursor-value-set cursor "B")
+        (cursor-insert cursor))
+      (let ((cursor (cursor-open session "index:terms:reversed")))
+        (with-cnx cnx
+          (let loop ((next? (cursor-next cursor))
+                     (out '()))
+            (if next?
+                (let ((key (cursor-key-ref cursor)))
+                  (loop (catch 'wiredtiger
+                          (lambda () (cursor-next cursor) #true)
+                          (lambda ignore #false))
+                        (cons key out)))
+                out)))))
+    '(("B") ("b") ("A") ("a")))
   )
