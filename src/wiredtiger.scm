@@ -353,9 +353,8 @@ NULL))))
   (s32vector-ref bv 0))
 
 (define (item->bytes item)
-  (let* ((size (s32vector-ref item 1)))
-    (pk item)
-    (pointer->bytevector (make-pointer (s64vector-ref item 0)) 4 0 'u8)))
+  (let* ((size (s32vector-ref item 2)))
+    (bytevector-copy (pointer->bytevector (make-pointer (s64vector-ref item 0)) size 0 'u8))))
 
 (define *item->value* `((#\S . ,item->string)
                         (#\Q . ,item->integer)
@@ -400,7 +399,7 @@ NULL))))
 
 (define (make-bytes-item bv)
   (let ((item  (u64vector 0 0)))
-    (s32vector-set! item 1 (bytevector-length bv))
+    (s32vector-set! item 2 (bytevector-length bv))
     (u64vector-set! item 0 (pointer-address (bytevector->pointer bv)))
     (bytevector->pointer item)))
 
@@ -626,11 +625,11 @@ NULL))))
                 (let ((cursor (cursor-open session "table:terms" "append")))
                   (cursor-value-set cursor (u8vector 1 2 3 4))
                   (cursor-insert cursor)
-                  (pk 'after-insert)
                   (cursor-reset cursor)
                   (cursor-next cursor)
-                  (with-cnx cnx (car (cursor-value-ref cursor)))))
-              1)
+                  (with-cnx cnx
+                    (cursor-value-ref cursor))))
+              '(#vu8(1 2 3 4)))
 
   ;; (test-check "create table with scheme collator"
   ;;   (receive (cnx ctx) (wiredtiger-open* "/tmp/wt" '(table
