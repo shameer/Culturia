@@ -3,3 +3,4 @@
 ** add join support cf. http://source.wiredtiger.com/develop/cursor_join.html
 ** create bytesmart sort preserving packing for scheme
 ** It should up to the caller to call cursor-reset, remove it from cursor-range and others
+** support signed integers
