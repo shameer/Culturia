@@ -105,14 +105,6 @@
   (unless (eq? code 0)
     (throw 'wiredtiger (wiredtiger-string-error code))))
 
-(define (wiredtiger-struct-unpack session buffer size format)
-  (let* ((args (map (lambda _ (u64vector 0)) (string->list format)))
-                 (args* (map bytevector->pointer args))
-                 (signature (map (lambda _ POINTER) args*))
-                 (function (apply wiredtiger (cons* int "wiredtiger_struct_unpack" '* '* size_t '* signature))))
-        (apply function (cons* session (make-pointer buffer) size (string->pointer format) args*))
-(pointers->scm format args)))
-
 ;;;
 ;;; Connection
 ;;;
@@ -169,9 +161,9 @@
 (define (make-collator format proc)
   (lambda (collator session key other cmp)
         (let* ((key (pointer->bytevector key 2 0 'u64))
-                   (key (wiredtiger-struct-unpack session (array-ref key 0) (array-ref key 1) format)))
+                   (key (%wiredtiger-struct-unpack session (make-pointer (array-ref key 0)) (array-ref key 1) format)))
           (let* ((other (pointer->bytevector other 2 0 'u64))
-                         (other (wiredtiger-struct-unpack session (array-ref other 0) (array-ref other 1) format)))
+                 (other (%wiredtiger-struct-unpack session (make-pointer (array-ref other 0)) (array-ref other 1) format)))
                         (s32vector-set! (pointer->bytevector cmp 1 0 's32) 0 (proc key other))
                         0))))
 
@@ -480,6 +472,49 @@ NULL))))
 
 (export with-cnx)
 
+;;; helpers
+
+(define (wiredtiger-struct-size session format . args)
+  (let* ((size (u64vector 0))
+         (items (formats->items format args))
+         (signature (map (lambda _ '*) args))
+         (function (apply wiredtiger (cons* int "wiredtiger_struct_size" '* '* '* signature))))
+    (check (apply function (cons* (*session-pointer session)
+                                  (bytevector->pointer size)
+                                  (string->pointer format)
+                                  items)))
+    (u64vector-ref size 0)))
+
+(define (wiredtiger-struct-pack session format . args) 
+  (let* ((size (apply wiredtiger-struct-size (cons* session format args)))
+         (buffer (apply u8vector (iota size)))
+         (items (formats->items format args))
+         (signature (map (lambda _ '*) args))
+         (function (apply wiredtiger (cons* int "wiredtiger_struct_pack" '* '* size_t '* signature))))
+    (check (apply function (cons* (*session-pointer session)
+                                  (bytevector->pointer buffer)
+                                  size
+                                  (string->pointer format)
+                                  items)))
+    buffer))
+    
+(define (%wiredtiger-struct-unpack session buffer size format)
+  ;; session must the raw pointer, not the record
+  (let* ((args (map (lambda _ (u64vector 0)) (string->list format)))
+                 (args* (map bytevector->pointer args))
+                 (signature (map (lambda _ POINTER) args*))
+                 (function (apply wiredtiger (cons* int "wiredtiger_struct_unpack" '* '* size_t '* signature))))
+        (apply function (cons* session buffer size (string->pointer format) args*))
+(pointers->scm format args)))
+
+(define (wiredtiger-struct-unpack session buffer format)
+  (%wiredtiger-struct-unpack (*session-pointer session)
+                             (bytevector->pointer buffer)
+                             (bytevector-length buffer)
+                             format))
+
+;;; tests
+
 (use-modules (test-check))
 
 (when (or (getenv "CHECK") (getenv "CHECK_WIREDTIGER"))
@@ -630,6 +665,22 @@ NULL))))
                   (with-cnx cnx
                     (cursor-value-ref cursor))))
               '(#vu8(1 2 3 4)))
+
+  (test-check "wiredtiger-struct-size"
+              (let* ((cnx (connection-open "/tmp/wt" "create"))
+                     (session (session-open cnx)))
+                (with-cnx cnx
+                  (wiredtiger-struct-size session "qQS" 1 42 "héllo")))
+              '9)
+
+  (test-check "wiredtiger-struct-pack/unpack"
+    (let* ((cnx (connection-open "/tmp/wt" "create"))
+           (session (session-open cnx)))
+      (with-cnx cnx
+        (wiredtiger-struct-unpack session 
+                                  (wiredtiger-struct-pack session "qQS" 1 42 "héllo")
+                                  "qQS")))
+    '(1 42 "héllo"))
 
   ;; (test-check "create table with scheme collator"
   ;;   (receive (cnx ctx) (wiredtiger-open* "/tmp/wt" '(table
