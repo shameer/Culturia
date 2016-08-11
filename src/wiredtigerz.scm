@@ -157,7 +157,7 @@
                (unsigned-integer . "Q")
                (positive-integer . "Q")
                (integer . "q")
-               (raw . "u"))
+               (bytes . "u"))
              symbol))
 
 
