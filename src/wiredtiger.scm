@@ -485,7 +485,7 @@ NULL))))
                                   items)))
     (u64vector-ref size 0)))
 
-(define (wiredtiger-struct-pack session format . args) 
+(define-public (wiredtiger-struct-pack session format . args) 
   (let* ((size (apply wiredtiger-struct-size (cons* session format args)))
          (buffer (apply u8vector (iota size)))
          (items (formats->items format args))
@@ -507,12 +507,11 @@ NULL))))
         (apply function (cons* session buffer size (string->pointer format) args*))
 (pointers->scm format args)))
 
-(define (wiredtiger-struct-unpack session buffer format)
+(define-public (wiredtiger-struct-unpack session buffer format)
   (%wiredtiger-struct-unpack (*session-pointer session)
                              (bytevector->pointer buffer)
                              (bytevector-length buffer)
                              format))
-
 ;;; tests
 
 (use-modules (test-check))
