@@ -154,13 +154,13 @@ exec guile -L $(dirname $(dirname $0)) -e '(uav)' -s $0 "$@"
 
 
 ;;;
-;;; query*
+;;; uav/query
 ;;;
 ;;
 ;; tuple syntax to query database
 ;;
 
-(define-syntax query*
+(define-syntax uav/query
   (lambda (x)
     (define (is-not-free-var? sym)
       (let ((sym (symbol->string sym)))
@@ -178,14 +178,14 @@ exec guile -L $(dirname $(dirname $0)) -e '(uav)' -s $0 "$@"
         (datum->syntax ctx vars)))
 
     (syntax-case x (:where)
-      ((query* names ... :where ((u a v) ...))
+      ((uav/query names ... :where ((u a v) ...))
        (with-syntax ((vars (make-vars x #'(names ...) #'((u a v) ...))))
          #'(reify-all (lambda (names ...)
                         (fresh vars
                            ((query *context*) u a v) ...))
                       'names ...))))))
 
-(export query*)
+(export uav/query)
 
 ;;;
 ;;; client/server
