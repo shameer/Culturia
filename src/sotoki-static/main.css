@@ -6,8 +6,11 @@ h1, h2, h3, h4, h5, h6 {
     font-family: 'Open Sans', sans;
 }
 
+pre {
+    overflow-x: scroll;
+}
+
 body > .container {
-    max-width: 900px;
     padding: 15px;
     font-size: 18px;
 }
@@ -20,6 +23,7 @@ div.question {
     border-right: 1px solid hsl(0, 0%, 70%);
     margin-right: 15px;
     padding-right: 15px;
+    max-width: 900px;
 }
 
 div.post div.main {
@@ -29,6 +33,8 @@ div.post div.main {
 div.post div.main .body {
     text-align: justify;
     line-height: 1.2em;
+    padding-left: 15px;
+    max-width: 750px;
 }
 
 div.post div.reputation {
@@ -68,4 +74,8 @@ div.post div.comments {
 
 div.post div.comments .comment {
     border-bottom: 1px solid hsl(0, 0%, 90%);
+}
+
+div.relateds {
+    max-width: 200px;
 }
