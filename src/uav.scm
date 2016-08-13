@@ -83,7 +83,7 @@ exec guile -L $(dirname $(dirname $0)) -e '(uav)' -s $0 "$@"
 (define-public (uav-ref* uid)
   (let* ((context (fluid-ref *context*))
          (cursor (context-ref context 'tuples))
-         (assoc (assocify (cursor-range cursor uid ""))))
+         (assoc (assocify (cursor-range-prefix cursor uid ""))))
     assoc))
 
 (define (make-uid)
@@ -122,7 +122,7 @@ exec guile -L $(dirname $(dirname $0)) -e '(uav)' -s $0 "$@"
 (define-public (uav-index-ref attribute value)
   (let* ((context (fluid-ref *context*))
          (cursor (context-ref context 'tuples-index)))
-    (map (match-lambda ((head uid) uid))
+    (map (match-lambda ((uid) uid))
          (cursor-range cursor (scm->string attribute) (scm->string value)))))
 
 ;;; minikaren extension for querying the uav database

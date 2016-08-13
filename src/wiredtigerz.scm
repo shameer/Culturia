@@ -460,15 +460,17 @@ if KEY is not found"
   (with-cursor cursor
     (let ((code (catch 'wiredtiger
                   (lambda () (apply cursor-search-near* (cons cursor key-prefix)))
-                  (lambda (key . args) -1))))
-      (if (< code 0)
-          (list)
-          (let loop ((out (list))
-                     (next (prefix? key-prefix (cursor-key-ref cursor))))
-            (if next
-                (loop (acons (cursor-key-ref cursor) (cursor-value-ref cursor) out)
-                      (next?))
-                out))))))
+                  (lambda (key . args) #f))))
+      (if code
+          (if (or (eq? code 0) (eq? code 1) (and (eq? code -1) (cursor-next* cursor)))
+              (let loop ((out (list))
+                         (valid? (prefix? key-prefix (cursor-key-ref cursor))))
+                (if valid?
+                    (loop (acons (cursor-key-ref cursor) (cursor-value-ref cursor) out)
+                          (next?))
+                    out))
+              '())
+          '()))))
 
 ;;;
 ;;; generate-uid
@@ -506,7 +508,7 @@ if KEY is not found"
   (test-check "create table config without index"
     (config-prepare-create '(atoms
                              ((uid . record))
-                             ((assoc . raw))
+                             ((assoc . bytes))
                              ()))
     (list (list "table:atoms" "key_format=r,value_format=u,columns=(uid,assoc)")))
 
@@ -525,7 +527,7 @@ if KEY is not found"
   (test-check "create cursor config without index"
     (config-prepare-open '(atoms
                            ((uid . record))
-                           ((assoc . raw))
+                           ((assoc . bytes))
                            ()))
     (list (list 'atoms (list "table:atoms"))
           (list 'atoms-append (list "table:atoms" "append"))))
@@ -533,7 +535,7 @@ if KEY is not found"
   (test-check "create cursor config with index with and without projection"
     (config-prepare-open '(atoms
                            ((uid . record))
-                           ((assoc . raw))
+                           ((assoc . bytes))
                            ((reversex (assoc) (uid))
                             (reverse (assoc) ()))))
     (list (list 'atoms (list "table:atoms"))
