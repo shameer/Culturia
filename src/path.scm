@@ -48,7 +48,7 @@
        ((or (equal? entry ".") (equal? entry "..")) (loop))
        (else (let ((path (path-join dirpath entry)))
                (if (equal? (stat:type (stat path)) 'directory)
-                   (path-walk path proc)
+                   (begin (path-walk path proc) (loop))
                    (begin (proc path) (loop))))))))
   (closedir dir)
   (proc (path-join dirpath)))
