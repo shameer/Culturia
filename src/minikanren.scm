@@ -254,78 +254,78 @@
 
 ;;; Parsing stuff
 
-(define (make-leaf! name values)
-  (lambda (in diff^ out^)
-    (lambda (s/c)
-      (let ((in (walk* in (car s/c))))
-        ((apply disj* (map (lambda (value)
-                             (conj+ (== (car in) value)
-                                    (== diff^ (cdr in))
-                                    (== out^ (cons name (car in)))))
-                             values)) s/c)))))
+;; (define (make-leaf! name values)
+;;   (lambda (in diff^ out^)
+;;     (lambda (s/c)
+;;       (let ((in (walk* in (car s/c))))
+;;         ((apply disj* (map (lambda (value)
+;;                              (conj+ (== (car in) value)
+;;                                     (== diff^ (cdr in))
+;;                                     (== out^ (cons name (car in)))))
+;;                              values)) s/c)))))
     
 
-(define name! (make-leaf! 'NAME '(amz3 rain1 nekk)))
+;; (define name! (make-leaf! 'NAME '(amz3 rain1 nekk)))
 
-(define determiner! (make-leaf! 'DETERMINER '(a the)))
+;; (define determiner! (make-leaf! 'DETERMINER '(a the)))
 
-(define noun! (make-leaf! 'NOUN '(space
-                                  cat
-                                  travel
-                                  guitar
-                                  music
-                                  movie
-                                  piano)))
+;; (define noun! (make-leaf! 'NOUN '(space
+;;                                   cat
+;;                                   travel
+;;                                   guitar
+;;                                   music
+;;                                   movie
+;;                                   piano)))
 
-(define verb! (make-leaf! 'VERB '(create see listen play)))
+;; (define verb! (make-leaf! 'VERB '(create see listen play)))
 
-(define question! (make-leaf! 'Q '(who how what where)))
+;; (define question! (make-leaf! 'Q '(who how what where)))
 
-;; parse rules
+;; ;; parse rules
 
-(define (np! np diff^ out^)
-  (conde ((fresh (out2)
-                 (name! np diff^ out2)
-                 (== out^ (cons 'NP out2))))
-         ((fresh (fresh diff2 out2 out3)
-                 (determiner! np diff2 out2)
-                 (noun! diff2 diff^ out3)
-                 (== out^ (cons 'NP (cons out2 out3)))))))
+;; (define (np! np diff^ out^)
+;;   (conde ((fresh (out2)
+;;                  (name! np diff^ out2)
+;;                  (== out^ (cons 'NP out2))))
+;;          ((fresh (fresh diff2 out2 out3)
+;;                  (determiner! np diff2 out2)
+;;                  (noun! diff2 diff^ out3)
+;;                  (== out^ (cons 'NP (cons out2 out3)))))))
 
-(define (s! s diff^ out^)
-  (disj+
-   (fresh (out2 diff2 out3 diff3 out4)
-          (np! s diff2 out2)
-          (verb! diff2 diff3 out3)
-          (np! diff3 diff^ out4)
-          (== out^ (list 'S out2 out3 out4)))
-   (fresh (out2 diff2 out3 diff3 out4)
-          (question! s diff2 out2)
-          (verb! diff2 diff3 out3)
-          (np! diff3 diff^ out4)
-          (== out^ (list 'S out2 out3 out4)))))
+;; (define (s! s diff^ out^)
+;;   (disj+
+;;    (fresh (out2 diff2 out3 diff3 out4)
+;;           (np! s diff2 out2)
+;;           (verb! diff2 diff3 out3)
+;;           (np! diff3 diff^ out4)
+;;           (== out^ (list 'S out2 out3 out4)))
+;;    (fresh (out2 diff2 out3 diff3 out4)
+;;           (question! s diff2 out2)
+;;           (verb! diff2 diff3 out3)
+;;           (np! diff3 diff^ out4)
+;;           (== out^ (list 'S out2 out3 out4)))))
 
 
-(define (parse-sentence sentence)
-  (caar (reify* (out)
-                (fresh (diff)
-                       (s! sentence diff out)))))
+;; (define (parse-sentence sentence)
+;;   (caar (reify* (out)
+;;                 (fresh (diff)
+;;                        (s! sentence diff out)))))
 
-(define the-cat-play-the-guiar (pk (parse-sentence '(the cat play the guitar))))
-(define who-play-the-guitar (pk (parse-sentence '(who play the guitar))))
-(pk (parse-sentence '(amz3 play the piano)))
+;; (define the-cat-play-the-guiar (pk (parse-sentence '(the cat play the guitar))))
+;; (define who-play-the-guitar (pk (parse-sentence '(who play the guitar))))
+;; (pk (parse-sentence '(amz3 play the piano)))
 
-(let ((sentences '((the cat play the guitar) (amz3 play the piano))))
-  (let ((sentences (map parse-sentence sentences)))
-    (map (lambda (s)
-           (map pk (reify* (out)
-                           (== (list 'S out '(VERB . play) '(NP (DETERMINER . the) NOUN . guitar)) s))))
-         sentences)))
+;; (let ((sentences '((the cat play the guitar) (amz3 play the piano))))
+;;   (let ((sentences (map parse-sentence sentences)))
+;;     (map (lambda (s)
+;;            (map pk (reify* (out)
+;;                            (== (list 'S out '(VERB . play) '(NP (DETERMINER . the) NOUN . guitar)) s))))
+;;          sentences)))
 
-;;; ((() (S (NP (DETERMINER . a) NOUN . cat) (VERB . play) (NP (DETERMINER . the) NOUN . guitar))))
+;; ;;; ((() (S (NP (DETERMINER . a) NOUN . cat) (VERB . play) (NP (DETERMINER . the) NOUN . guitar))))
 
-(define tree '(what the fuck))
+;; (define tree '(what the fuck))
 
-;; (define (wheno matcher rewrite)
-;;   (
+;; ;; (define (wheno matcher rewrite)
+;; ;;   (
 
