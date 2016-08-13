@@ -1,4 +1,5 @@
 (use-modules (ice-9 match))
+(use-modules ((srfi srfi-1) #:select (fold)))
 (use-modules (ice-9 receive))
 (use-modules (path))
 (use-modules (srfi srfi-26))
@@ -69,7 +70,24 @@
                                                  (cons (symbol-append (string->symbol filename) '/ key)
                                                        value)))
                                   row)))))))
-         (list "Posts" "Badges" "Comments" "PostLinks" "Tags" "Users" "Votes"))))))
+         (list "Tags" "Posts" "Badges" "Comments" "PostLinks" "Users" "Votes"))
+        ;; Posts.xml get a special treatment because we need to create tags links
+        (let ((filename "Posts.xml"))
+          (let ((filepath (path-join "stackoverflow/dump" (string-append filename ".xml"))))
+            (format #t "* loading ~s\n" filepath)
+            (for-each-element-in-file filepath
+              (lambda (tag row)
+                (when (eq? tag 'row)
+                  ;; add the row like normal
+                  (uav-add! (map (match-lambda ((key . value)
+                                                (cons (symbol-append (string->symbol filename) '/ key)
+                                                      value)))
+                                 row))
+                  ;; add TagLinks
+                  (for-each (lambda (tag) (uav-add! `((TagLinks/PostId . ,(assoc-ref row 'Id))
+                                                      (TagLinks/TagName . ,tag))))
+                            (split-tags (assco-ref row 'Tags))))))))))))
+        
 
 (define (comment-ref uid)
   (let* ((comment (uav-ref* uid))
@@ -106,8 +124,11 @@
 (define (split-tags tags)
   (map (lambda (tag) (string-drop (string-take tag (1- (string-length tag))) 1))
        (map match:substring (list-matches "<[^>]+>" (or tags "")))))
-  
 
+(define (relateds question)
+  (map (lambda (uid)
+         (uav-ref* (car (uav-index-ref 'Posts/Id (assoc-ref (uav-ref* uid) 'PostLinks/RelatedPostId)))))
+       (uav-index-ref 'PostLinks/PostId (assoc-ref question 'Posts/Id))))
 
 (define (template:post post)
   `(div (@ (class "post"))
@@ -116,10 +137,12 @@
                   (div (@ (class "score"))
                        score: ,(assoc-ref post 'Posts/Score))
                   (div (@ (class "favorites"))
-                       favorites: ,(or (assoc-ref post 'Posts/FavoriteCount) 0)))
+                       favorites: ,(or (assoc-ref post 'Posts/FavoriteCount) 0))
+                  (div (@ (class "views"))
+                       views: ,(or (assoc-ref post 'Posts/ViewCount) 0)))
              (div
               (div (@ (class "body"))
-                  ,(cdr (html->sxml (pk (assoc-ref post 'Posts/Body)))))
+                  ,(cdr (html->sxml (assoc-ref post 'Posts/Body))))
               (div (@ (class "metadata"))
                    (ul (@ (class "tags"))
                        ,(map (lambda (name) `(li (a (@ (href ,(string-append "../tags/" name))) ,name)))
@@ -131,12 +154,11 @@
                            `(div (@ (class "comment"))
                                  (p
                                   (span ,(assoc-ref comment 'Comments/Score)) " "
-                                  (span ,(assoc-ref comment 'Comments/CreationDate)) " "
-                                  (span ,(assoc-ref comment 'Comments/Text)) " " 
-                                  (span ,(assoc-ref (assoc-ref comment 'Comments/User) 'Users/DisplayName))
+                                  (span ,(assoc-ref comment 'Comments/Text)) " "
+                                  (span ,(assoc-ref (assoc-ref comment 'Comments/User) 'Users/DisplayName)) " "
+                                  (span ,(assoc-ref comment 'Comments/CreationDate))
                                  )))
                          (assoc-ref post 'Posts/Comments)))))))
-
 
 (define (template:question question)
   `(html
@@ -154,12 +176,21 @@
     (body (@ (class "question"))
           (div (@ (class "container"))
                (h1 "stackoverflow")
-               (div
-                (div (@ (class "question"))
-                     (h2 ,(assoc-ref question 'Posts/Title))
-                     ,(template:post question))
-                (div (@ (class "answers"))
-                     ,(map template:post (assoc-ref question 'Posts/Answers))))))))
+               (div (@ (class "container"))
+                    (div (@ (class "question"))
+                         (div 
+                          (h2 ,(assoc-ref question 'Posts/Title))
+                          ,(template:post question))
+                         (div (@ (class "answers"))
+                              ,(map template:post (assoc-ref question 'Posts/Answers))))
+                    (div (@ (class "related"))
+                         (h3 "Related questions")
+                         (ul ,(map (lambda (related)
+                                     `(li (a (@ (href ,(string-append (slugify (assoc-ref related 'Posts/Title))
+                                                                      ".html")))
+                                             ,(assoc-ref related 'Posts/Title))))
+                                   (relateds question)))))))))
+  
 
 
 (define (render-question questions-directory question)
@@ -188,10 +219,15 @@
         (format #t "* rendering questions in ~s\n" questions-directory)
         (let* ((uids (list->stream (uav-index-ref 'Posts/PostTypeId "1")))
                (questions (stream-map question-ref uids)))
-          (stream-for-each (cut render-question questions-directory <>) (stream-take 10 questions)))))))
+          (catch #t
+            (lambda ()
+              (stream-for-each (cut render-question questions-directory <>) questions))
+            (lambda (key . args)
+              (format #t "** failed ~a ~a" key args))))))))
+    
 
 
-;; (load "stackoverflow")
+(load "stackoverflow")
 (render "stackoverflow")
 
 

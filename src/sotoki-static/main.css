@@ -12,6 +12,16 @@ body > .container {
     font-size: 18px;
 }
 
+body > .container .container {
+    display: flex;
+}
+
+div.question {
+    border-right: 1px solid hsl(0, 0%, 70%);
+    margin-right: 15px;
+    padding-right: 15px;
+}
+
 div.post div.main {
     display: flex;
 }
@@ -54,4 +64,8 @@ div.post div.comments {
     font-family: 'Open Sans', sans;
     font-size: 0.7em;
     color: hsl(0, 0%, 30%);
+}
+
+div.post div.comments .comment {
+    border-bottom: 1px solid hsl(0, 0%, 90%);
 }
