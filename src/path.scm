@@ -39,7 +39,7 @@
       (if (not (path-exists? dirpath)) (and (mkdir dirpath) #true))))
 
 
-(define-public (path-dfs-walk dirpath proc)
+(define-public (path-walk dirpath proc)
   (define dir (opendir dirpath))
   (let loop ()
     (let ((entry (readdir dir)))
@@ -48,18 +48,17 @@
        ((or (equal? entry ".") (equal? entry "..")) (loop))
        (else (let ((path (path-join dirpath entry)))
                (if (equal? (stat:type (stat path)) 'directory)
-                   (begin (path-dfs-walk path proc)
-                          (proc path))
+                   (path-walk path proc)
                    (begin (proc path) (loop))))))))
   (closedir dir)
   (proc (path-join dirpath)))
 
 
 (define-public (rmtree path)
-  (path-dfs-walk path (lambda (path)
-                        (if (equal? (stat:type (stat path)) 'directory)
-                            (rmdir path)
-                            (delete-file path)))))
+  (path-walk path (lambda (path)
+                    (if (equal? (stat:type (stat path)) 'directory)
+                        (rmdir path)
+                        (delete-file path)))))
 
 
 (define-syntax-rule (with-directory path e ...)
