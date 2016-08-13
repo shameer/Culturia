@@ -6,4 +6,4 @@
 ** create bytesmart sort preserving packing for scheme
 ** It should up to the caller to call cursor-reset, remove it from cursor-range and others
 ** support signed integers
-* stackoverflow->wiredtiger
+* sotoki
