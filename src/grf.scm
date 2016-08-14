@@ -188,6 +188,11 @@
   (let ((cursor (context-ref context 'vertex-label)))
     (map cadr (cursor-range cursor label))))
 
+(define-public (vertex-range context key value)
+  (map car (call-with-cursor context 'vertex-index-avu
+             (lambda (cursor)
+               (cursor-range cursor (symbol->string key) (scm->string value))))))
+
 ;;;
 ;;; Edge
 ;;;
@@ -250,6 +255,11 @@
   (let ((cursor (context-ref context 'edge-label)))
     (map cadr (cursor-range cursor label))))
 
+(define-public (edge-range context key value)
+  (map car (call-with-cursor context 'edge-index-avu
+             (lambda (cursor)
+               (cursor-range cursor (symbol->string key) (scm->string value))))))
+
 ;;;
 ;;; tests
 ;;;
@@ -286,5 +296,16 @@
         (with-cnx cnx
           (vertex-assoc-ref (vertex-ref context (vertex-uid vertex)) 'a))))
       666)
-  )
 
+  (test-check "index"
+    (receive (cnx context) (apply wiredtiger-open* (cons "/tmp/wt" *grf*))
+      (begin
+        (vertex-add! context "fail" '((a . 101)))
+        (vertex-add! context "test 2" '((a . 42)))
+        (vertex-add! context "test 3" '((a . 42)))
+        (vertex-add! context "test 4" '((a . 42)))
+        (vertex-add! context "fail" '((a . 101)))
+        (with-cnx cnx
+          (vertex-range context 'a 42))))
+      '(4 3 2))
+  )
