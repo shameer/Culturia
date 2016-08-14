@@ -7,3 +7,5 @@
 ** It should up to the caller to call cursor-reset, remove it from cursor-range and others
 ** support signed integers
 * sotoki
+* Doc
+** fix markdown parser cf. wiredtigerz.md
