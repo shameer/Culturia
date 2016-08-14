@@ -1,7 +1,11 @@
-(use-modules (ice-9 match))
+(use-modules ((htmlprag) #:select (html->sxml)))
 (use-modules ((srfi srfi-1) #:select (fold)))
+(use-modules (html))
+(use-modules (ice-9 match))
 (use-modules (ice-9 receive))
+(use-modules (ice-9 regex))
 (use-modules (path))
+(use-modules (srfi srfi-26))
 (use-modules (srfi srfi-26))
 (use-modules (srfi srfi-41))
 (use-modules (sxml simple))
@@ -9,10 +13,6 @@
 (use-modules (uav))
 (use-modules (wiredtiger))
 (use-modules (wiredtigerz))
-(use-modules (ice-9 regex))
-(use-modules (srfi srfi-26))
-(use-modules ((htmlprag) #:select (html->sxml)))
-(use-modules (html))
 
 (setlocale LC_ALL "")
 
