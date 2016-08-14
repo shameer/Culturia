@@ -70,23 +70,7 @@
                                                  (cons (symbol-append (string->symbol filename) '/ key)
                                                        value)))
                                   row)))))))
-         (list "Tags" "Badges" "Comments" "PostLinks" "Users" "Votes"))
-        ;; Posts.xml get a special treatment because we need to create tags links
-        (let ((filename "Posts"))
-          (let ((filepath (path-join "stackoverflow/dump" (string-append filename ".xml"))))
-            (format #t "** loading ~s\n" filepath)
-            (for-each-element-in-file filepath
-              (lambda (tag row)
-                (when (eq? tag 'row)
-                  ;; add the row like normal
-                  (uav-add! (map (match-lambda ((key . value)
-                                                (cons (symbol-append (string->symbol filename) '/ key)
-                                                      value)))
-                                 row))
-                  ;; add TagLinks
-                  (for-each (lambda (tag) (uav-add! `((TagLinks/PostId . ,(assoc-ref row 'Id))
-                                                      (TagLinks/TagName . ,tag))))
-                            (split-tags (assoc-ref row 'Tags))))))))))))
+         (list "Posts" "Comments" "PostLinks" "Users"))))))
 
 
 (define (comment-ref uid)
