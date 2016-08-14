@@ -62,7 +62,7 @@
         (for-each
          (lambda (filename)
            (let ((filepath (path-join "stackoverflow/dump" (string-append filename ".xml"))))
-             (format #t "* loading ~s\n" filepath)
+             (format #t "** loading ~s\n" filepath)
              (for-each-element-in-file filepath
                (lambda (tag row)
                  (when (eq? tag 'row)
@@ -70,11 +70,11 @@
                                                  (cons (symbol-append (string->symbol filename) '/ key)
                                                        value)))
                                   row)))))))
-         (list "Tags" "Posts" "Badges" "Comments" "PostLinks" "Users" "Votes"))
+         (list "Tags" "Badges" "Comments" "PostLinks" "Users" "Votes"))
         ;; Posts.xml get a special treatment because we need to create tags links
-        (let ((filename "Posts.xml"))
+        (let ((filename "Posts"))
           (let ((filepath (path-join "stackoverflow/dump" (string-append filename ".xml"))))
-            (format #t "* loading ~s\n" filepath)
+            (format #t "** loading ~s\n" filepath)
             (for-each-element-in-file filepath
               (lambda (tag row)
                 (when (eq? tag 'row)
@@ -86,8 +86,8 @@
                   ;; add TagLinks
                   (for-each (lambda (tag) (uav-add! `((TagLinks/PostId . ,(assoc-ref row 'Id))
                                                       (TagLinks/TagName . ,tag))))
-                            (split-tags (assco-ref row 'Tags))))))))))))
-        
+                            (split-tags (assoc-ref row 'Tags))))))))))))
+
 
 (define (comment-ref uid)
   (let* ((comment (uav-ref* uid))
@@ -240,3 +240,7 @@
   (test-check "slugify"
     (slugify "abc *-def")
     "abc---def"))
+
+;;; Local Variables:
+;;; compile-command: "guile -L . sotoki.scm"
+;;; End:
