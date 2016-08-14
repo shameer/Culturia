@@ -32,7 +32,7 @@ exec guile -L $(dirname $(dirname $0)) -e '(uav)' -s $0 "$@"
 (define-public *context* (make-unbound-fluid))
 
 (define-public (uav-open path)
-  (define connection (connection-open path "create,log={enabled=true,recover=on}"))
+  (define connection (connection-open path "create"))
   (define session (session-open connection))
   (session-create* session *tuples*)
   (session-close session)
