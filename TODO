@@ -7,5 +7,7 @@
 ** It should up to the caller to call cursor-reset, remove it from cursor-range and others
 ** support signed integers
 * sotoki
-* Doc
+* Documentation
 ** fix markdown parser cf. wiredtigerz.md
+* grf
+** change type of label to symbol
