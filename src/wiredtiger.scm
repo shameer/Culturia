@@ -465,8 +465,9 @@ NULL))))
   (let ((function (pointer->procedure* int (*cursor-close cursor) POINTER)))
     (session-check (*cursor-session cursor) (function (*cursor-pointer cursor)))))
 
-(define-syntax-rule (with-cnx cnx e ...)
-  (let ((out (begin e ...)))
+(define-syntax-rule (with-cnx connection e ...)
+  (let ((cnx connection)
+        (out (begin e ...)))
     (connection-close cnx)
     out))
 

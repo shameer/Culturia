@@ -93,6 +93,7 @@ exec guile -L $(dirname $(dirname $0)) -e '(uav)' -s $0 "$@"
   (let* ((context (fluid-ref *context*))
          (uid (make-uid))
          (cursor (context-ref context 'tuples)))
+
     (for-each (lambda (pair)
                 (cursor-insert* cursor
                                 (list uid (scm->string (car pair)))
@@ -122,8 +123,7 @@ exec guile -L $(dirname $(dirname $0)) -e '(uav)' -s $0 "$@"
 (define-public (uav-index-ref attribute value)
   (let* ((context (fluid-ref *context*))
          (cursor (context-ref context 'tuples-index)))
-    (map (match-lambda ((uid) uid))
-         (cursor-range cursor (scm->string attribute) (scm->string value)))))
+    (map car (cursor-range cursor (scm->string attribute) (scm->string value)))))
 
 ;;; minikaren extension for querying the uav database
 
@@ -274,3 +274,12 @@ exec guile -L $(dirname $(dirname $0)) -e '(uav)' -s $0 "$@"
 (define-public (main args)
   (let ((port (string->number (list-ref args 1))))
     (uav-server "db" port)))
+
+
+;;; tests
+
+(use-modules (test-check))
+
+(when (or (getenv "CHECK") (getenv "CHECK_UAV"))
+  (format #t "* testing uav\n"))
+  

@@ -27,107 +27,12 @@
 
 (use-modules (wiredtiger))
 (use-modules (wiredtigerz))
+(use-modules (plain))
+(use-modules (uav))
 
-;;;
-;;; plain records
-;;;
-;;
-;; macro to quickly define immutable records
-;;
-;;
-;; Usage:
-;;
-;;   (define-record-type <car> seats wheels)
-;;   (define smart (make-car 2 4))
-;;   (car-seats smart) ;; => 2
-;;
-;; Mutation is *not* done in place, via set-field or set-fields eg.:
-;;
-;; (define smart-for-4 (set-field smart (seats) 4))
-;;
-
-(define-syntax define-record-type*
-  (lambda (x)
-    (define (%id-name name) (string->symbol (string-drop (string-drop-right (symbol->string name) 1) 1)))
-    (define (id-name ctx name)
-      (datum->syntax ctx (%id-name (syntax->datum name))))
-    (define (id-append ctx . syms)
-      (datum->syntax ctx (apply symbol-append (map syntax->datum syms))))
-    (syntax-case x ()
-      ((_ rname field ...)
-       (and (identifier? #'rname) (and-map identifier? #'(field ...)))
-       (with-syntax ((cons (id-append #'rname #'make- (id-name #'rname #'rname)))
-                     (pred (id-append #'rname (id-name #'rname #'rname) #'?))
-                     ((getter ...) (map (lambda (f)
-                                          (id-append f (id-name #'rname #'rname) #'- f))
-                                        #'(field ...))))
-         #'(define-record-type rname
-             (cons field ...)
-             pred
-             (field getter)
-             ...))))))
-
-;;;
-;;; Grf
-;;;
-
-(define-public *grf* '((vertex
-                        ((uid . record))
-                        ((label . string)
-                         (assoc . string))
-                        ((label (label) (uid))))
-                       (vertex-index
-                        ((uid . unsigned-integer)
-                         (key . string))
-                        ((value . string))
-                        ((avu (key value) (uid))))
-                       (edge
-                        ((uid . record))
-                        ((start . unsigned-integer)
-                         (label . string)
-                         (end . unsigned-integer)
-                         (assoc . string))
-                        ((label (label) (uid))
-                         (outgoings (start) (uid))
-                         (incomings (end) (uid))))
-                       (edge-index
-                        ((uid . unsigned-integer)
-                         (key . string))
-                        ((value . string))
-                        ((avu (key value) (uid))))))
-
-;;; vertex-index and edge-index helpers
-
-(define (index-insert! cursor uid assoc)
-  (let loop ((assoc assoc))
-    (unless (null? assoc)
-      (cursor-insert* cursor (list uid (symbol->string (caar assoc))) (list (scm->string (cdar assoc))))
-      (loop (cdr assoc)))))
-
-(define (assoc-diff old new)
-  (values (lset-difference eq? (map car new) (map car old)) ; added
-          (lset-difference equal? new (lset-intersection equal? new old)) ; updated
-          (lset-difference eq? (map car old) (map car new)))) ; deleted
-
-(define (index-update! cursor uid old new)
-  (receive (added updated deleted) (assoc-diff old new)
-    (index-insert! cursor uid added)
-    (let update ((updated updated))
-      (unless (null? updated)
-        (cursor-update* cursor
-                        (list uid (symbol->string (caar updated)))
-                        (list (scm->string (cdar updated))))
-        (update (cdr updated))))
-    (let delete ((deleted deleted))
-      (unless (null? deleted)
-        (cursor-remove* cursor uid (symbol->string (car deleted)))
-        (delete (cdr deleted))))))
-
-;;;
 ;;; Vertex
-;;;
 
-(define-record-type* <vertex> uid label assoc initial-assoc)
+(define-record-type* <vertex> uid assoc)
 
 (export vertex-uid vertex-assoc)
 
@@ -138,25 +43,22 @@
                                     (vertex-uid record)
                                     (vertex-label record))))
 
-(define-public (vertex-ref context uid)
-  (let ((cursor (context-ref context 'vertex)))
-    (match (cursor-value-ref* cursor uid)
-      (() (throw 'vertex-not-found uid))
-      ((label assoc)
-       (let ((assoc (string->scm assoc)))
-         (make-vertex uid label assoc assoc))))))
+(define-public (vertex-ref uid)
+  (let ((assoc (uav-ref* uid)))
+    (if (null? assoc)
+        (throw 'vertex-not-found uid)
+        (make-vertex uid assoc))))
+
+(define-public (vertex-label vertex)
+  (assoc-ref (vertex-assoc vertex) 'vertex/label))
 
 (define-public (vertex-label? edge label)
   (equal? (vertex-label edge) label))
 
-(define-public (vertex-add! context label assoc)
-  (let ((uid (call-with-cursor context 'vertex-append
-               (lambda (cursor)
-                 (cursor-insert* cursor '() (list label (scm->string assoc)))))))
-    (call-with-cursor context 'vertex-index
-      (lambda (cursor)
-        (index-insert! cursor uid assoc)))
-    (make-vertex uid label assoc assoc)))
+(define-public (vertex-add! label assoc)
+  (let* ((assoc (acons 'vertex/label label assoc))
+         (uid (uav-add! assoc)))
+    (make-vertex uid assoc)))
 
 (define-public (vertex-assoc-set vertex key value)
   (let* ((assoc (vertex-assoc vertex))
@@ -166,40 +68,24 @@
 (define-public (vertex-assoc-ref vertex key)
   (assoc-ref (vertex-assoc vertex) key))
 
-(define-public (vertex-save! context vertex)
-  (call-with-cursor context 'vertex
-    (lambda (cursor)
-      (cursor-update* cursor
-                      (list (vertex-uid vertex))
-                      (list (vertex-label vertex) (scm->string (vertex-assoc vertex))))))
-  (call-with-cursor context 'vertex-index
-    (lambda (cursor)
-      (index-update! cursor (vertex-uid vertex) (vertex-initial-assoc vertex) (vertex-assoc vertex)))))
+(define-public (vertex-save! vertex)
+  (uav-update! (vertex-uid vertex) (vertex-assoc vertex)))
 
-(define-public (vertex-outgoings context uid)
-  (let ((cursor (context-ref context 'edge-outgoings)))
-    (map car (cursor-range cursor uid))))
+(define-public (vertex-outgoings vertex)
+  (uav-index-ref 'edge/start (vertex-uid vertex)))
+  
+(define-public (vertex-incomings vertex)
+  (uav-index-ref 'edge/end (vertex-uid vertex)))
 
-(define-public (vertex-incomings context uid)
-  (let ((cursor (context-ref context 'edge-incomings)))
-    (map car (cursor-range cursor uid))))
+(define-public (vertex-with-label label)
+  (uav-index-ref 'vertex/label label))
 
-(define-public (vertex-with-label context label)
-  (let ((cursor (context-ref context 'vertex-label)))
-    (map cadr (cursor-range cursor label))))
 
-(define-public (vertex-range context key value)
-  (map car (call-with-cursor context 'vertex-index-avu
-             (lambda (cursor)
-               (cursor-range cursor (symbol->string key) (scm->string value))))))
-
-;;;
 ;;; Edge
-;;;
 
-(define-record-type* <edge> uid start label end assoc initial-assoc)
+(define-record-type* <edge> uid assoc)
 
-(export edge-uid edge-start edge-label edge-end edge-assoc)
+(export edge-uid edge-assoc)
 
 (set-record-type-printer! <edge>
                           (lambda (record port)
@@ -210,25 +96,30 @@
                                     (edge-label record)
                                     (edge-end record))))
 
-(define-public (edge-ref context uid)
-  (let ((cursor (context-ref context 'edge)))
-    (match (cursor-value-ref* cursor uid)
-      (() (throw 'edge-not-found uid))
-      ((start label end assoc)
-       (let ((assco (string->scm assoc)))
-         (make-edge uid start label end assoc assoc))))))
+(define-public (edge-label edge)
+  (assoc-ref (edge-assoc edge) 'edge/label))
+
+(define-public (edge-start edge)
+  (vertex-ref (assoc-ref (edge-assoc edge) 'edge/start)))
+
+(define-public (edge-end edge)
+  (vertex-ref (assoc-ref (edge-assoc edge) 'edge/end)))
+
+(define-public (edge-ref uid)
+  (let ((assoc (uav-ref* uid)))
+    (if (null? assoc)
+        (throw 'edge-not-found uid)
+        (make-edge uid assoc))))
 
 (define-public (edge-label? edge label)
   (equal? (edge-label edge) label))
 
-(define-public (edge-add! context start label end assoc)
-  (let ((uid (call-with-cursor context 'edge-append
-               (lambda (cursor)
-                 (cursor-insert* cursor #nil (list start label end (scm->string assoc)))))))
-    (call-with-cursor context 'vertex-index
-      (lambda (cursor)
-        (index-insert! cursor uid assoc)))
-    (make-edge uid start label end assoc assoc)))
+(define-public (edge-add! start label end assoc)
+  (let* ((assoc (acons 'edge/label label assoc))
+         (assoc (acons 'edge/start (vertex-uid start) assoc))
+         (assoc (acons 'edge/end (vertex-uid end) assoc))
+         (uid (uav-add! assoc)))
+    (make-edge uid assoc)))
 
 (define-public (edge-assoc-update edge key value)
   (let* ((assoc (edge-assoc edge))
@@ -238,74 +129,51 @@
 (define-public (edge-assoc-ref edge key)
   (assoc-ref (edge-assoc edge) key))
 
-(define-public (edge-save! context edge)
-  (call-with-cursor context 'edge
-    (lambda (cursor)
-      (cursor-update* cursor
-                      (list (edge-uid edge))
-                      (list (edge-start edge)
-                            (edge-label edge)
-                            (edge-end edge)
-                            (scm->string (edge-assoc edge))))))
-  (call-with-cursor context 'edge-index
-    (lambda (cursor)
-      (index-update! cursor (edge-uid edge) (edge-initial-assoc edge) (edge-assoc edge)))))
+(define-public (edge-save! edge)
+  (uav-update! (edge-uid edge) (edge-assoc edge)))
 
-(define-public (edge-with-label context label)
-  (let ((cursor (context-ref context 'edge-label)))
-    (map cadr (cursor-range cursor label))))
+(define-public (edge-with-label label)
+  (uav-index-ref 'edge/label label))
 
-(define-public (edge-range context key value)
-  (map car (call-with-cursor context 'edge-index-avu
-             (lambda (cursor)
-               (cursor-range cursor (symbol->string key) (scm->string value))))))
 
-;;;
 ;;; tests
-;;;
 
 (use-modules (test-check))
 
 (when (or (getenv "CHECK") (getenv "CHECK_GRF"))
   (format #t "* Testing grf\n")
 
-  (test-check "wiredtigerz"
-    (receive (cnx context) (apply wiredtiger-open* (cons "/tmp/wt" *grf*))
-      (with-cnx cnx
-        #true))
-    #true)
+  (test-check "uav-open*"
+      (with-cnx (uav-open* "/tmp/wt")
+        #true)
+      #true)
 
   (test-check "vertex-add!"
-    (receive (cnx context) (apply wiredtiger-open* (cons "/tmp/wt" *grf*))
-      (with-cnx cnx
-        (vertex-uid (vertex-add! context "test" '((a . 42))))))
-        1)
+    (with-cnx (uav-open* "/tmp/wt")
+      (vertex-assoc-ref (vertex-ref (vertex-uid (vertex-add! 'test '((a . 42))))) 'a))
+    42)
 
-  (test-check "vertex-ref"
-    (receive (cnx context) (apply wiredtiger-open* (cons "/tmp/wt" *grf*))
-      (let ((vertex (vertex-add! context "test" '((a . 42)))))
-        (with-cnx cnx
-          (vertex-assoc (vertex-ref context (vertex-uid vertex))))))
-      '((a . 42)))
+  (test-check "edge-add!"
+    (with-cnx (uav-open* "/tmp/wt")
+      (let ((start (vertex-add! 'start '()))
+            (end (vertex-add! 'end '())))
+        (edge-assoc-ref (edge-ref (edge-uid (edge-add! start 'test end '((a . 42))))) 'a)))
+    42)
 
-  (test-check "vertex-save!"
-    (receive (cnx context) (apply wiredtiger-open* (cons "/tmp/wt" *grf*))
-      (let* ((vertex (vertex-add! context "test" '((a . 42))))
-             (vertex (vertex-assoc-set vertex 'a 666)))
-        (vertex-save! context vertex)
-        (with-cnx cnx
-          (vertex-assoc-ref (vertex-ref context (vertex-uid vertex)) 'a))))
-      666)
-
-  (test-check "index"
-    (receive (cnx context) (apply wiredtiger-open* (cons "/tmp/wt" *grf*))
-      (begin
-        (vertex-add! context "fail" '((a . 101)))
-        (vertex-add! context "test 2" '((a . 42)))
-        (vertex-add! context "test 3" '((a . 42)))
-        (vertex-add! context "test 4" '((a . 42)))
-        (vertex-add! context "fail" '((a . 101)))
-        (with-cnx cnx
-          (vertex-range context 'a 42))))
-      '(4 3 2))
+  (test-check "vertex-outgoings and incomings"
+    (with-cnx (uav-open* "/tmp/wt")
+      (let ((vertex (vertex-add! 'vertex '())))
+        (edge-add! vertex 'test vertex '())
+        (apply equal? (list (vertex-outgoings vertex)
+                            (vertex-incomings vertex)))))
+    #t)
+    
+  (test-check "edge-start and end"
+    (with-cnx (uav-open* "/tmp/wt")
+      (let* ((vertex (vertex-add! 'vertex '()))
+             (edge (edge-add! vertex 'test vertex '())))
+        (apply equal? (list (edge-start edge)
+                            (edge-end edge)
+                            vertex))))
+    #t)
   )

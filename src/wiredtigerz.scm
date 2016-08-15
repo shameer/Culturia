@@ -456,7 +456,6 @@ if KEY is not found"
         (prefix? key-prefix (cursor-key-ref cursor)))
       (lambda (key . args)
         #false)))
-
   (with-cursor cursor
     (let ((code (catch 'wiredtiger
                   (lambda () (apply cursor-search-near* (cons cursor key-prefix)))
