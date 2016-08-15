@@ -19,9 +19,11 @@
            ;; Create a string port from the response
            (response-port (open-input-string response-string))
            ;; Have the (web response) module to parse the response
-           (response (read-response response-port)))
+           (response (read-response response-port))
+           (body (utf8->string (read-response-body response))))
+      (close response-port)
       ;; Have the (web response) module extract the body from the
       ;; response
-      (values response (utf8->string (read-response-body response))))))
+      (values response body))))
 
 
