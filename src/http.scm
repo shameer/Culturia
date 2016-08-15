@@ -1,21 +1,24 @@
 (define-module (http))
 
 
-(use-modules (curl)
-             (web response)
-             (ice-9 pretty-print)
-             (rnrs bytevectors))
+(use-modules (web response))
+(use-modules (rnrs bytevectors))
+(use-modules (ice-9 popen))
+(use-modules (ice-9 rdelim))
+
+
+;;; wrapping curl command
+
+(define (curl url)
+  (let* ((port (open-input-pipe (format #f "curl -is ~a" url)))
+         (response (read-string port)))
+    (close-pipe port)
+    response))
 
 
 (define-public (http-get url)
   ;; Create a Curl handle
-  (let ((handle (curl-easy-init)))
-    ;; Set the URL from which to get the data
-    (curl-easy-setopt handle 'url url)
-    ;; Request that the HTTP headers be included in the response
-    (curl-easy-setopt handle 'header #t)
-    ;; Get the result as a Latin-1 string
-    (let* ((response-string (curl-easy-perform handle))
+    (let* ((response-string (curl url))
            ;; Create a string port from the response
            (response-port (open-input-string response-string))
            ;; Have the (web response) module to parse the response
@@ -24,6 +27,4 @@
       (close response-port)
       ;; Have the (web response) module extract the body from the
       ;; response
-      (values response body))))
-
-
+      (values response body)))
