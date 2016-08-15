@@ -31,7 +31,6 @@
 
 (use-modules (wiredtiger))
 (use-modules (wiredtigerz))
-(use-modules (uav))
 
 ;;;
 ;;; Guile helpers
@@ -42,33 +41,50 @@
   (match query (value e ...)))
 
 
-(define connection (uav-open "db"))
-(define context (uav-context-open connection))
-
 (define iterator 0)
 (define step 1)
 
 (define (iter)
   (if (equal? iterator 100000)
       (begin (set! iterator 0) (pk 'step step) (set! step (1+ step)))
-  (set! iterator (1+ iterator))))
+      (set! iterator (1+ iterator))))
 
-
+;;
+;; entry example
+;;
+;; (("source_uri" . "/and/[/s/rule/synonym_section/,/s/web/de.wiktionary.org/wiki/Achteckstempel/]")
+;;  ("surfaceText" . "[[Achteckstempel]] is an antonym of [[Rundstempel]]")
+;;  ("surfaceEnd" . "Rundstempel")
+;;  ("rel" . "/r/Antonym")
+;;  ("license" . "/l/CC/By-SA")
+;;  ("dataset" . "/d/wiktionary/de/de")
+;;  ("surfaceStart" . "Achteckstempel")
+;;  ("start" . "/c/de/achteckstempel")
+;;  ("id" . "/e/d21b13a6aa03f4df3ebccc898c48d4052bbb5130")
+;;  ("sources" . #("/s/rule/synonym_section" "/s/web/de.wiktionary.org/wiki/Achteckstempel"))
+;;  ("features" . #("/c/de/achteckstempel /r/Antonym -" "/c/de/achteckstempel - /c/de/rundstempel" "- /r/Antonym /c/de/rundstempel"))
+;;  ("weight" . 1.0)
+;;  ("end" . "/c/de/rundstempel")
+;;  ("uri" . "/a/[/r/Antonym/,/c/de/achteckstempel/,/c/de/rundstempel/]")
+;;  ("context" . "/ctx/all"))
 
 (define (add entry)
-  (with-transaction context
-    (uav-add! context entry)))
+  (pk entry))
 
-(define path "data/conceptnet/part_0")
+(define path "conceptnet/part_0")
 
 (let next-file ((index 0))
   (let* ((filename (pk (string-append path (number->string index) ".msgpack")))
          (file (open filename  O_RDONLY)))
     (let next-entry ((entry (get-unpack file)))
       (if (eof-object? entry)
-          (when (not (equal? index 0))
-              (begin (close file) (set! step 0) (next-file (1+ index))))
-          (begin (iter) (add entry) (next-entry (get-unpack file)))))))
+          (unless (equal? index 0)
+            (close file)
+            (set! step 0)
+            (next-file (1+ index)))
+          (begin (iter)
+                 (add entry)
+                 (next-entry (get-unpack file)))))))
 
 
 (connection-close connection)
