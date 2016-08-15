@@ -12,20 +12,21 @@
     (string->number body)))
 
 
-(define (assocify assoc)
-  (let ((assoc (cdr assoc)))
-    assoc))
+(define (assocify ht)
+  (hash-map->list cons ht))
 
 (define (dump)
   (call-with-output-file "hn.msgpack"
     (lambda (port)
       (let loop ((uid (max-id)))
+        (display ".")
         (unless (eq? uid 0)
           (let* ((url "https://hacker-news.firebaseio.com/v0/item/~a.json")
                  (url (format #f url uid)))
             (receive (response body) (http-get url)
-              (let ((bv (pack (assocify (call-with-input-string body read-json)))))
-                (put-bytevector port bv)))))))))
+              (let ((bv (pack (assocify (json-string->scm body)))))
+                (put-bytevector port bv))))
+          (loop (1- uid)))))))
 
 (define (load)
   (let* ((filename "hn.msgpack")
@@ -35,6 +36,6 @@
         (pk entry)
         (next-entry (get-unpack file))))))
 
-(load)
-
+(dump)
+;; (load)
         
