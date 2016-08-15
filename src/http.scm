@@ -7,7 +7,7 @@
              (rnrs bytevectors))
 
 
-(define (http-get url)
+(define-public (http-get url)
   ;; Create a Curl handle
   (let ((handle (curl-easy-init)))
     ;; Set the URL from which to get the data
