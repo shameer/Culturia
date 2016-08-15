@@ -22,6 +22,6 @@
            (response (read-response response-port)))
       ;; Have the (web response) module extract the body from the
       ;; response
-      (values response (read-response-body response)))))
+      (values response (utf8->string (read-response-body response))))))
 
 
