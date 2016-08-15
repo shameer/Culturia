@@ -179,13 +179,17 @@
 
 
 (define (render-question questions-directory question)
-  (let* ((filename (path-join questions-directory
-                              (string-append (slugify (assoc-ref question 'Posts/Title))
-                                             ".html"))))
-    (format #t "** rendering ~s\n" filename)
-    (call-with-output-file filename
-      (lambda (port)
-        (sxml->html (template:question question) port)))))
+  (catch #true
+    (lambda ()
+      (let* ((filename (path-join questions-directory
+                                  (string-append (slugify (assoc-ref question 'Posts/Title))
+                                                 ".html"))))
+        (format #t "** rendering ~s\n" filename)
+        (call-with-output-file filename
+          (lambda (port)
+            (sxml->html (template:question question) port)))))
+    (lambda _ (format #t "** failed"))))
+
 
 (define (render work)
   (let* ((db (path-join work "db"))
@@ -204,11 +208,7 @@
         (format #t "* rendering questions in ~s\n" questions-directory)
         (let* ((uids (list->stream (uav-index-ref 'Posts/PostTypeId "1")))
                (questions (stream-map question-ref uids)))
-          (catch #t
-            (lambda ()
-              (stream-for-each (cut render-question questions-directory <>) questions))
-            (lambda (key . args)
-              (format #t "** failed ~a ~a" key args))))))))
+          (stream-for-each (cut render-question questions-directory <>) questions))))))
     
 
 
