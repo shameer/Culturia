@@ -166,6 +166,7 @@
                           (h2 ,(assoc-ref question 'Posts/Title))
                           ,(template:post question))
                          (div (@ (class "answers"))
+                              (h2 "Answers")
                               ,(map template:post (assoc-ref question 'Posts/Answers))))
                     (div (@ (class "related"))
                          (h3 "Related questions")
