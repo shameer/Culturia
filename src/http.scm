@@ -10,7 +10,7 @@
 ;;; wrapping curl command
 
 (define-public (curl url)
-  (let* ((port (open-input-pipe (format #f "curl -is ~a" url)))
+  (let* ((port (open-input-pipe (format #f "curl -is \"~a\"" url)))
          (response (read-string port)))
     (close-pipe port)
     response))
