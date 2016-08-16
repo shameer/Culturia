@@ -4,6 +4,7 @@
 (use-modules (rnrs io ports))
 (use-modules (ice-9 receive))
 (use-modules (ice-9 threads))
+(use-modules (ice-9 rdelim))
 (use-modules (http))
 (use-modules (msgpack))
 
@@ -15,7 +16,6 @@
         (pack `(("url" . ,url) ("response" . ,response)))))
     (lambda _ (pk _) '())))
 
-
 (define (store bv)
   (unless (null? bv)
     (display ".")
@@ -23,12 +23,18 @@
       (put-bytevector port bv)
       (close port))))
 
-(define urls (list "https://www.dashingd3js.com/data-visualization-and-d3-newsletter/data-visualization-and-d3-newsletter-issue-80"
-                    "http://www.kalzumeus.com/2014/05/12/conversion-optimization-in-practice-baconbiz-2013-presentation/"
-                    "http://weuse.meteor.com/"))
+(define (urls)
+  (call-with-input-file "hn.urls.txt"
+    (lambda (port)
+      (let loop ((out '())
+                 (line (read-line port)))
+        (if (eof-object? line)
+            out
+            (loop (cons line out) (read-line port)))))))
+                      
 
 (define (dump)
-  (n-for-each-par-map 1 store download urls))
+  (n-for-each-par-map 1 store download (urls)))
 
 (define (load)
   (let* ((filename "hn.msgpack")
