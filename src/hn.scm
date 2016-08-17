@@ -22,20 +22,20 @@
     (lambda ()
       (let* ((url "https://hacker-news.firebaseio.com/v0/item/~a.json")
              (url (format #f url (1+ uid))))
-        (receive (response body) (http-get url)
-          (pack (alist-delete "kids" (assocify (json-string->scm body)) equal?)))))
-    (lambda _ (pk _) '())))
+        (pack (curl url))))
+    (lambda _ '())))
 
 
 (define (store bv)
-  (unless (null? bv)
-    (display ".")
+  (if (null? bv)
+    (display "0")
     (let ((port (open-file "hn.msgpack" "ab")))
+      (display "1")
       (put-bytevector port bv)
       (close port))))
 
 (define (dump)
-  (n-for-each-par-map 8 store download (max-id)))
+  (n-for-each-par-map 8 store download (iota (max-id))))
 
 ;; (define (dump)
 ;;   (store (download 1)))
