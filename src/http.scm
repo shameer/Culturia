@@ -15,6 +15,8 @@
     (close-pipe port)
     response))
 
+(define-public (response-string->body string)
+  (call-with-input-string string (compose utf8->string read-response-body read-response)))
 
 (define-public (http-get url)
   ;; Create a Curl handle

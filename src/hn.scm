@@ -13,10 +13,6 @@
   (receive (response body) (http-get "https://hacker-news.firebaseio.com/v0/maxitem.json")
     (string->number body)))
 
-
-(define (assocify ht)
-  (hash-map->list cons ht))
-
 (define (download uid)
   (catch #t
     (lambda ()
@@ -24,7 +20,6 @@
              (url (format #f url (1+ uid))))
         (pack (curl url))))
     (lambda _ '())))
-
 
 (define (store bv)
   (if (null? bv)
@@ -37,17 +32,4 @@
 (define (dump)
   (n-for-each-par-map 8 store download (iota (max-id))))
 
-;; (define (dump)
-;;   (store (download 1)))
-
-;; (define (load)
-;;   (let* ((filename "hn.msgpack")
-;;          (file (open filename  O_RDONLY)))
-;;     (let next-entry ((entry (get-unpack file)))
-;;       (unless (eof-object? entry)
-;;         (pk entry)
-;;         (next-entry (get-unpack file))))))
-
 (dump)
-;; (load)
-        
