@@ -27,9 +27,9 @@
 
 (define (store pair)
   (if (equal? string "")
-    (pk "0")
+    (format #t "0\n")
     (let ((port (open-file "hn.scm" "a")))
-      (pk (car pair))
+      (format #t "~a\n" (car pair))
       (put-string port (cdr pair))
       (close port))))
 
