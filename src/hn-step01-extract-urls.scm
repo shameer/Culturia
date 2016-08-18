@@ -9,7 +9,7 @@
 (use-modules (msgpack))
 
 
-(setlocale LC_ALL "")
+;; (setlocale LC_ALL "")
 
 
 ;;;
@@ -21,14 +21,14 @@
 ;;; by curl -is over the HN API. cf. https://github.com/HackerNews/API
 ;;;
 
-(define-stream (msgpack->response-string-stream filename)
+(define-stream (scm->response-string-stream filename)
   (let ((file (open filename O_RDONLY)))
-    (stream-let next-entry ((entry (get-unpack file)))
+    (stream-let next-entry ((entry (read file)))
       (if (eof-object? entry)
           (begin (close file)
                  stream-null)
           (begin (display ".")
-                 (stream-cons entry (next-entry (get-unpack file))))))))
+                 (stream-cons entry (next-entry (read file))))))))
 
 (define (assocify ht)
   (hash-map->list cons ht))
@@ -65,6 +65,6 @@
             (cut stream-map (cut assoc-ref <> "url") <>)
             (cut stream-filter story? <>)
             (cut stream-map response-string->json <>))
-   (msgpack->response-string-stream input)))
+   (scm->response-string-stream input)))
 
-(extract-urls "data/hn.msgpack" "data/hn.urls.txt")
+(extract-urls "/home/amirouche/data/hn.scm" "/home/amirouche/data/hn.urls.txt")
