@@ -68,5 +68,3 @@
    (msgpack->response-string-stream input)))
 
 (extract-urls "data/hn.msgpack" "data/hn.urls.txt")
-
-;; (stream-for-each pk (stream-map response-string->json (msgpack->response-string-stream "data/hn.msgpack")))
