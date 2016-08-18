@@ -34,6 +34,6 @@
       (close port))))
 
 (define (dump)
-  (n-for-each-par-map 20 store download (iota 100)))
+  (n-for-each-par-map 20 store download (iota (max-id))))
 
 (dump)
