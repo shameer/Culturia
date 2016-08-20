@@ -80,6 +80,11 @@
 (define-public (vertex-with-label label)
   (uav-index-ref 'vertex/label label))
 
+(define-public (vertex-get-or-create attribute label assoc)
+  (match (uav-index-ref attribute (assoc-ref assoc attribute))
+    (() (values #true (vertex-add! label assoc)))
+    ((uid) (values #false (vertex-ref uid)))
+    (_ (throw 'database-is-broken))))
 
 ;;; Edge
 
@@ -176,4 +181,18 @@
                             (edge-end edge)
                             vertex))))
     #t)
+
+  (test-check "vertex-get-or-create not created"
+    (with-cnx (uav-open* "/tmp/wt")
+      (let* ((vertex (vertex-add! 'vertex '((a . 42)))))
+        (receive (created vertex) (vertex-get-or-create 'a 'vertex '((a . 42)))
+          created)))
+    #false)
+  
+  (test-check "vertex-get-or-create created"
+    (with-cnx (uav-open* "/tmp/wt")
+      (receive (created vertex) (vertex-get-or-create 'a 'vertex '((a . 42)))
+        created))
+    #true)
+  
   )
