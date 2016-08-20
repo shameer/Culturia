@@ -15,6 +15,8 @@ exec guile -L $(dirname $(dirname $0)) -e '(uav)' -s $0 "$@"
 (use-modules (wiredtigerz))
 
 
+(re-export with-cnx)
+
 
 (set! *random-state* (random-state-from-platform))
 

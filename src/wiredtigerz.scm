@@ -319,11 +319,15 @@ a two values: the connection and a context"
   (session-transaction-rollback (context-session context)))
 
 (define-syntax-rule (with-transaction context e ...)
-  (begin
-    (context-begin context)
-    (let ((out (begin e ...)))
-      (context-commit context)
-      out)))
+  (catch #true
+    (lambda ()
+      (context-begin context)
+      (let ((out (begin e ...)))
+        (context-commit context)
+        out))
+    (lambda (key . args)
+      (context-rollback context)
+      (apply throw (cons key args)))))
 
 (export with-transaction)
 

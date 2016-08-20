@@ -12,7 +12,6 @@
 ;;
 ;; inspired from ice-9 popen
 ;;
-(use-modules (ice-9 popen))
 
 (define open-process (@@ (ice-9 popen) open-process))
 
@@ -47,14 +46,11 @@
 
 ;; tokens
 
-(define punctuation (string->list "!\"#$%&\\'()*+,-./:;<=>?@[\\]^_`{|}~"))
+(define punctuation (string->list "!\"#$%&\\'()*+,-./:;<=>?@[\\]^_`{|}~\n\t"))
 
 (define (clean text)
   "Replace punctuation characters from TEXT with a space character"
   (string-map (lambda (char) (if (list-index (cut equal? char <>) punctuation) #\space char)) text))
-
-(define (clean-newlines text)
-  (string-map (lambda (char) (if (eq? #\newline char) #\space char)) text))
 
 (define split (cut string-split <> #\space))
 
@@ -63,4 +59,6 @@
   (filter (lambda (word) (< 1 (string-length word))) words))
 
 ;; XXX: compose must be read from right to left
-(define-public string->tokens (compose filter-stopwords sanitize split string-downcase clean-newlines clean))
+(define string->tokens (compose filter-stopwords delete-duplicates sanitize split string-downcase clean))
+
+(define-public html->tokens (compose string->tokens html2text))
