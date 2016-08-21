@@ -346,7 +346,9 @@ NULL))))
 
 (define (item->bytes item)
   (let* ((size (s32vector-ref item 2)))
-    (bytevector-copy (pointer->bytevector (make-pointer (s64vector-ref item 0)) size 0 'u8))))
+    (if (zero? size)
+        #vu8()
+        (bytevector-copy (pointer->bytevector (make-pointer (s64vector-ref item 0)) size 0 'u8)))))
 
 (define *item->value* `((#\S . ,item->string)
                         (#\Q . ,item->integer)
