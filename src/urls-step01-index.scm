@@ -1,4 +1,5 @@
-(use-modules (grf))
+(use-modules (wsh))
+(use-modules (wiredtigerz))
 (use-modules (htmlprag))
 (use-modules (http))
 (use-modules (ice-9 match))
@@ -51,31 +52,16 @@
       (lambda () (with-error-to-file "/dev/null" (lambda () (apply proc args))))
       (lambda _ '()))))
 
-(define (html->tokens* pair)
-  (cons (car pair) (html->tokens (cdr pair))))
+(define (store ctx)
+  (match-lambda ((url . html)
+                 (index ctx url html)
+                 (display "."))))
 
 
-(define (link-to-token vertex)
-  (lambda (token)
-    (receive (new token) (vertex-get-or-create 'token 'token `((token . ,token)))
-      (edge-add! vertex 'contains token '()))))
-
-(define index (match-lambda
-                ((url . tokens)
-                 (catch #true
-                   (lambda ()
-                     (let ((vertex (vertex-add! 'url `((url . ,url)))))
-                       (for-each (link-to-token vertex) tokens))
-                     (display "."))
-                   (lambda _ (display "x"))))))
-
-(define cnx (uav-open* "/tmp/wt"))
-
-(with-cnx cnx
-  ((compose (cut stream-for-each index <>)
-            (cut stream-filter valid? <>)
-            (cut stream-map (maybe html->tokens*) <>)
-            (cut stream-filter valid? <>)
-            (cut stream-map (maybe parse) <>)
-            (cut stream-filter valid? <>))
-   (file->scm "data/hn.stories.alpha.scm")))
+(receive (cnx ctx) (apply wiredtiger-open* (cons "/tmp/wt" *wsh*))
+  (with-cnx cnx
+    ((compose (cut stream-for-each (store ctx) <>)
+              (cut stream-filter valid? <>)
+              (cut stream-map (maybe parse) <>)
+              (cut stream-filter valid? <>))
+     (file->scm "data/hn.stories.alpha.scm"))))

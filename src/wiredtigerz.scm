@@ -348,7 +348,7 @@ a two values: the connection and a context"
 (export with-cursor)
 
 (define-syntax-rule (call-with-cursor context name proc)
-  (let* ( (cursor (context-ref context name)))
+  (let ((cursor (context-ref context name)))
     (let ((out (proc cursor)))
       (cursor-reset cursor)
         out)))
@@ -379,7 +379,7 @@ This procedure return a boolean instead of throwing an exception"
   "Prints the whole table starting at cursor position"
   (pk 'cursor-debug cursor)
   (with-cursor cursor
-    (let loop ((next #true))
+    (let loop ((next (cursor-next* cursor)))
       (when next
         (pk (cursor-key-ref cursor) (cursor-value-ref cursor))
         (loop (cursor-next* cursor))))))
@@ -398,7 +398,8 @@ will be returned. This is useful in the case of a table with
 a single record key column."
   (unless (null? key)
     (apply cursor-key-set (cons cursor key)))
-  (apply cursor-value-set (cons cursor value))
+  (unless (null? value)
+    (apply cursor-value-set (cons cursor value)))
   (cursor-insert cursor)
   (when (null? key)  ;; used with single record key column
     (car (cursor-key-ref cursor))))

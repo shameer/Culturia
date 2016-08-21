@@ -16,14 +16,16 @@
 (define open-process (@@ (ice-9 popen) open-process))
 
 (define (html2text string)
-  (call-with-values (lambda () (open-process OPEN_BOTH "html2text"))
-    (lambda (read-port write-port pid)
-      (display string write-port)
-      (close-port write-port)
-      (let ((str (read-string read-port)))
-        (close-port read-port)
-        (waitpid pid)
-        str))))
+  (with-error-to-file "/dev/null"
+    (lambda ()
+      (call-with-values (lambda () (open-process OPEN_BOTH "html2text"))
+        (lambda (read-port write-port pid)
+          (display string write-port)
+          (close-port write-port)
+          (let ((str (read-string read-port)))
+            (close-port read-port)
+            (waitpid pid)
+            str))))))
 
 ;;;
 ;;; tokenizing
@@ -59,6 +61,6 @@
   (filter (lambda (word) (< 1 (string-length word))) words))
 
 ;; XXX: compose must be read from right to left
-(define string->tokens (compose filter-stopwords delete-duplicates sanitize split string-downcase clean))
+(define string->tokens (compose filter-stopwords sanitize split string-downcase clean))
 
 (define-public html->tokens (compose string->tokens html2text))
