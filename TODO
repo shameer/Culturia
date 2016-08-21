@@ -2,6 +2,7 @@
 
 * create sophia.systems bindings
 * wiredtiger / wiredtigerz
+** improve exceptions
 ** improve connection-add-collator to use scheme spec instead of wt columns strings
 ** add join support cf. http://source.wiredtiger.com/develop/cursor_join.html
 ** create bytesmart sort preserving packing for scheme
