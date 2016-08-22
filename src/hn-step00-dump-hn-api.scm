@@ -23,15 +23,15 @@
               (call-with-output-string
                (lambda (port)
                  (write (curl url) port))))))
-    (lambda _ "")))
+    (lambda _ '())))
 
 (define (store pair)
-  (if (equal? string "")
-    (format #t "0\n")
-    (let ((port (open-file "hn.scm" "a")))
-      (format #t "~a\n" (car pair))
-      (put-string port (cdr pair))
-      (close port))))
+  (if (null? pair)
+      (format #t "0\n")
+      (let ((port (open-file "hn.scm" "a")))
+        (format #t "~a\n" (car pair))
+        (put-string port (cdr pair))
+        (close port))))
 
 (define (dump)
   (n-for-each-par-map 16 store download (reverse (iota (max-id)))))
