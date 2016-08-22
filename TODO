@@ -1,14 +1,18 @@
 -*- mode: org -*-
 
 * create sophia.systems bindings
-* wiredtiger / wiredtigerz
-** add support for true mutithreaded context with multiple cursors
+* wiredtiger
 ** improve exceptions
 ** improve connection-add-collator to use scheme spec instead of wt columns strings
 ** add join support cf. http://source.wiredtiger.com/develop/cursor_join.html
 ** create bytesmart sort preserving packing for scheme
-** It should up to the caller to call cursor-reset, remove it from cursor-range and others
 ** support signed integers
+* wiredtigerz
+** improve performance of cursor-count-near
+** It should up to the caller to call cursor-reset, remove it from cursor-range and others
+
+** add support for true mutithreaded context with multiple cursors
+
 * offline use
 * Documentation
 ** fix markdown parser cf. wiredtigerz.md
