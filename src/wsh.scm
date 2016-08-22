@@ -2,6 +2,7 @@
 
 (use-modules (text))
 (use-modules (ice-9 receive))
+(use-modules (srfi srfi-26))
 (use-modules (srfi srfi-1))
 (use-modules (ice-9 match))
 (use-modules (wiredtigerz))
@@ -57,12 +58,12 @@
     (lambda (key . args) #f)
     #f))
 
-(define (search/term ctx term)
+(define (search ctx term)
   (let ((uid (term-uid ctx term)))
     (call-with-cursor ctx 'inverted-index
       (lambda (cursor)
         ;; return document-id and position
-        (map cdar (cursor-range-prefix cursor uid 0 0))))))
+        (map cadar (cursor-range-prefix cursor uid 0 0))))))
 
 (define (debug ctx)
   (call-with-cursor ctx 'inverted-index
@@ -80,16 +81,11 @@
   (cons 'or args))
 
 
-(define* ((resolve/terms ctx) query)
-  (match query
-    (('and . args) (cons 'and (map (resolve/terms ctx) args)))
-    (('or . args) (cons 'or (map (resolve/terms ctx) args)))
-    ((term . value) (term-uid ctx value))))
-
-                              
 (define (search/vm ctx query)
-  (let ((query* ((resolve/terms ctx) query)))
-    query*))
+  (match query
+    (('term . term) (pk 'term term (search ctx term)))
+    (('and . args) (pk 'and (apply lset-intersection (cons eq? (map (cut search/vm ctx <>) args)))))
+    (('or . args) (pk 'or (append-map (cut search/vm ctx <>) args)))))
 
 ;;;
 ;;; tests
@@ -114,5 +110,5 @@
         (index ctx "http://example.net" "database & pgsql")
         (search/vm ctx (search/and (search/term "database") (search/or (search/term "postgresql")
                                                                        (search/term "pgsql"))))))
-    '((2 0)))
+    '(5 1))
   )
