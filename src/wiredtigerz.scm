@@ -398,8 +398,7 @@ will be returned. This is useful in the case of a table with
 a single record key column."
   (unless (null? key)
     (apply cursor-key-set (cons cursor key)))
-  (unless (null? value)
-    (apply cursor-value-set (cons cursor value)))
+  (apply cursor-value-set (cons cursor value))
   (cursor-insert cursor)
   (when (null? key)  ;; used with single record key column
     (car (cursor-key-ref cursor))))
