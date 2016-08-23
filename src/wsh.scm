@@ -102,9 +102,23 @@
 (define (search/vm ctx query)
   (match query
     (('term . term) (search ctx term))
-    (('and . args) (apply lset-intersection (cons eq? (map (cut search/vm ctx <>) args))))
+    (('and . args)
+     ;; separate 'not' for others
+     (let* ((nots (filter (lambda (arg) (eq? (car arg) 'not)) args))
+            (others (lset-difference equal? args nots)))
+       ;; retrieve hits before applying 'not'
+       (let* ((nots (map (cut search/vm ctx <>) nots))
+              (hits (apply lset-intersection (cons eq? (map (cut search/vm ctx <>) others)))))
+         (let loop ((nots nots)
+                    (hits hits))
+           (cond
+            ((null? nots) hits)
+            ((null? hits) '())
+            (else (loop (cdr nots) ((car nots) hits))))))))
     (('or . args) (append-map (cut search/vm ctx <>) args))
-    (('not . arg) (lambda (hits) (lset-difference eq? hits (search/vm ctx query))))))
+    (('not . arg) (lambda (hits)
+                    (lset-difference eq? hits (search/vm ctx arg))))))
+
 ;;;
 ;;; tests
 ;;;
@@ -130,6 +144,41 @@
                                                                        (search/term "pgsql"))))))
     '(5 1))
 
+  (test-check "search/vm and/not"
+    (receive (cnx ctx) (apply wiredtiger-open* (cons "/tmp/wt" *wsh*))
+      (with-cnx cnx
+        (index ctx "http://example.net" "database & postgresql")
+        (index ctx "http://example.net" "spam & pgsql")
+        (index ctx "http://example.net" "spam & egg")
+        (index ctx "http://example.net" "database & egg")
+        (index ctx "http://example.net" "database & pgsql")
+        (search/vm ctx (search/and (search/term "database") (search/not (search/term "egg"))))))
+    '(5 1))
+
+  (test-check "search/vm and/not/and"
+    (receive (cnx ctx) (apply wiredtiger-open* (cons "/tmp/wt" *wsh*))
+      (with-cnx cnx
+        (index ctx "http://example.net" "database & egg")
+        (index ctx "http://example.net" "database & spam & egg")
+        (index ctx "http://example.net" "database & spam & egg")
+        (index ctx "http://example.net" "database & egg")
+        (index ctx "http://example.net" "database & spam")
+        (search/vm ctx (search/and (search/term "database") (search/not (search/and (search/term "egg")
+                                                                                    (search/term "spam")))))))
+    '(5 4 1))
+
+  (test-check "search/vm and/not"
+    (receive (cnx ctx) (apply wiredtiger-open* (cons "/tmp/wt" *wsh*))
+      (with-cnx cnx
+        (index ctx "http://example.net" "database & postgresql")
+        (index ctx "http://example.net" "spam & pgsql")
+        (index ctx "http://example.net" "spam & egg")
+        (index ctx "http://example.net" "database & egg")
+        (index ctx "http://example.net" "database & pgsql")
+        (search/vm ctx (search/and (search/term "database") (search/not (search/or (search/term "egg")
+                                                                                   (search/term "pgsql")))))))
+    '(1))
+  
   (test-check "search/make-predicate 1"
     (receive (cnx ctx) (apply wiredtiger-open* (cons "/tmp/wt" *wsh*))
       (with-cnx cnx
