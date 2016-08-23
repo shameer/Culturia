@@ -425,7 +425,6 @@ if KEY is not found"
   (apply cursor-key-set (cons cursor key-prefix))
   (cursor-search-near cursor))
 
-
 ;; cursor-range
 
 (define-public (cursor-range cursor . key)
@@ -474,6 +473,10 @@ if KEY is not found"
                     out))
               '())
           '()))))
+
+(define-public (cursor-count-prefix cursor . key-prefix)
+  (length (apply cursor-range-prefix (cons cursor key-prefix))))
+
 
 ;;;
 ;;; generate-uid

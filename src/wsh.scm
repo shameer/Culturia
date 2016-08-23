@@ -80,13 +80,31 @@
 (define (search/or . args)
   (cons 'or args))
 
+(define (search/not arg)
+  (cons 'not arg))
+
+(define true? (cut eq? #t <>))
+
+(define (search/make-predicate ctx arg)
+  (match arg
+    (('term . term) (let ((termid (term-uid ctx term)))
+                      (lambda (docid)
+                        (call-with-cursor ctx 'inverted-index
+                          (lambda (cursor)
+                            (not (zero? (cursor-count-prefix cursor termid docid 0))))))))
+    (('and . args) (let ((predicates (map (cut search/make-predicate ctx <>) args)))
+                     (lambda (docid)
+                       (every true? (map (cut <> docid) predicates)))))
+    (('or . args) (let ((predicates (map (cut search/make-predicate ctx <>) args)))
+                    (lambda (docid)
+                      (any true? (map (cut <> docid) predicates)))))))
 
 (define (search/vm ctx query)
   (match query
-    (('term . term) (pk 'term term (search ctx term)))
-    (('and . args) (pk 'and (apply lset-intersection (cons eq? (map (cut search/vm ctx <>) args)))))
-    (('or . args) (pk 'or (append-map (cut search/vm ctx <>) args)))))
-
+    (('term . term) (search ctx term))
+    (('and . args) (apply lset-intersection (cons eq? (map (cut search/vm ctx <>) args))))
+    (('or . args) (append-map (cut search/vm ctx <>) args))
+    (('not . arg) (lambda (hits) (lset-difference eq? hits (search/vm ctx query))))))
 ;;;
 ;;; tests
 ;;;
@@ -100,10 +118,10 @@
         (not (null? (index ctx "http://example.net" "foo bar baz")))))
     #t)
 
-  (test-check "search/vm"
+  (test-check "search/vm and/or"
     (receive (cnx ctx) (apply wiredtiger-open* (cons "/tmp/wt" *wsh*))
       (with-cnx cnx
-        (index ctx "http://example.net" "database & postgresql ")
+        (index ctx "http://example.net" "database & postgresql")
         (index ctx "http://example.net" "spam & pgsql")
         (index ctx "http://example.net" "spam & egg")
         (index ctx "http://example.net" "database & egg")
@@ -111,4 +129,49 @@
         (search/vm ctx (search/and (search/term "database") (search/or (search/term "postgresql")
                                                                        (search/term "pgsql"))))))
     '(5 1))
+
+  (test-check "search/make-predicate 1"
+    (receive (cnx ctx) (apply wiredtiger-open* (cons "/tmp/wt" *wsh*))
+      (with-cnx cnx
+        (index ctx "http://example.net" "database & postgresql")
+        (index ctx "http://example.net" "spam & pgsql")
+        (index ctx "http://example.net" "spam & egg")
+        (index ctx "http://example.net" "database & egg")
+        (index ctx "http://example.net" "database & pgsql & spam")
+        (let* ((query (search/term "database"))
+               (predicate (search/make-predicate ctx query)))
+          
+          (filter predicate (map (cut + 1 <>) (iota 5))))))
+    '(1 4 5))
+
+  (test-check "search/make-predicate 2"
+    (receive (cnx ctx) (apply wiredtiger-open* (cons "/tmp/wt" *wsh*))
+      (with-cnx cnx
+        (index ctx "http://example.net" "database & postgresql")
+        (index ctx "http://example.net" "spam & pgsql")
+        (index ctx "http://example.net" "spam & egg")
+        (index ctx "http://example.net" "database & egg")
+        (index ctx "http://example.net" "database & pgsql & spam")
+        (let* ((query (search/and (search/term "database")
+                                  (search/term "postgresql")))
+               (predicate (search/make-predicate ctx query)))
+          
+          (filter predicate (map (cut + 1 <>) (iota 5))))))
+    '(1))
+
+  (test-check "search/make-predicate 3"
+    (receive (cnx ctx) (apply wiredtiger-open* (cons "/tmp/wt" *wsh*))
+      (with-cnx cnx
+        (index ctx "http://example.net" "database & postgresql")
+        (index ctx "http://example.net" "spam & pgsql")
+        (index ctx "http://example.net" "spam & egg")
+        (index ctx "http://example.net" "database & egg")
+        (index ctx "http://example.net" "database & pgsql & spam")
+        (let* ((query (search/and (search/term "database")
+                                  (search/or (search/term "postgresql")
+                                             (search/term "pgsql"))))
+               (predicate (search/make-predicate ctx query)))
+          
+          (filter predicate (map (cut + 1 <>) (iota 5))))))
+    '(1 5))
   )
