@@ -63,13 +63,12 @@
     (call-with-cursor ctx 'inverted-index
       (lambda (cursor)
         ;; return document-id and position
-        (map cadar (cursor-range-prefix cursor uid 0 0))))))
+        (delete-duplicates (map cadar (cursor-range-prefix cursor uid 0 0)))))))
 
 (define (debug ctx)
   (call-with-cursor ctx 'inverted-index
     (lambda (cursor)
       (cursor-debug cursor))))
-
 
 (define (search/term term)
   (cons 'term term))
@@ -115,9 +114,49 @@
             ((null? nots) hits)
             ((null? hits) '())
             (else (loop (cdr nots) ((car nots) hits))))))))
-    (('or . args) (append-map (cut search/vm ctx <>) args))
+    (('or . args) (delete-duplicates (append-map (cut search/vm ctx <>) args)))
     (('not . arg) (lambda (hits)
                     (lset-difference eq? hits (search/vm ctx arg))))))
+
+(define (unnest lst)
+  (let loop ((lst lst)
+             (out '()))
+    (if (null? lst)
+        out
+        (if (list? (car lst))
+            (loop (cdr lst) (append (unnest (car lst)) out))
+            (loop (cdr lst) (cons (car lst) out))))))
+
+(define (query-terms% ctx query)
+  (match query
+    (('term . term) (term-uid ctx term))
+    (('and . args) (map (cut query-terms% ctx <>) args))
+    (('or . args) (map (cut query-terms% ctx <>) args))
+    (('not . arg) '())))
+
+(define (query-terms ctx query)
+  "convert QUERY to a list of relevant terms for computing the score"
+  (unnest (query-terms% ctx query)))
+
+(define (term-frequency ctx term-id doc-id)
+  "frequency of TERM-ID in DOC-ID"
+  (call-with-cursor ctx 'inverted-index
+    (lambda (cursor)
+      (cursor-count-prefix cursor term-id doc-id 0))))
+
+(define (score ctx term-ids doc-id)
+  "score DOC-ID against TERM-IDS"
+  (apply + (map (cut term-frequency ctx <> doc-id) term-ids)))
+
+(define (search* ctx query)
+  "retrieve sorted document ids for QUERY"
+  ;; compute hits for query
+  (let ((hits (search/vm ctx query)))
+    ;; retrieve relevant query terms
+    (let ((term-ids (query-terms ctx query)))
+      ;; score every hits against terms
+      (let ((scores (map (cut score ctx term-ids <>) hits)))
+        (sort (map cons hits scores) (lambda (a b) (> (cdr a) (cdr b))) )))))
 
 ;;;
 ;;; tests
@@ -132,6 +171,42 @@
         (not (null? (index ctx "http://example.net" "foo bar baz")))))
     #t)
 
+  (test-check "query-terms 1"
+    (receive (cnx ctx) (apply wiredtiger-open* (cons "/tmp/wt" *wsh*))
+      (with-cnx cnx
+        (index ctx "http://example.net" "database")
+        (index ctx "http://example.net" "spam")
+        (index ctx "http://example.net" "egg")
+        (index ctx "http://example.net" "postgresql")
+        (index ctx "http://example.net" "pgsql")
+        (query-terms ctx (search/and (search/term "database") (search/term "spam")))))
+    '(2 1))
+
+  (test-check "query-terms 2"
+    (receive (cnx ctx) (apply wiredtiger-open* (cons "/tmp/wt" *wsh*))
+      (with-cnx cnx
+        (index ctx "http://example.net" "database")
+        (index ctx "http://example.net" "spam")
+        (index ctx "http://example.net" "egg")
+        (index ctx "http://example.net" "postgresql")
+        (index ctx "http://example.net" "pgsql")
+        (query-terms ctx (search/and (search/term "database") (search/term "spam")
+                                     (search/or (search/term "pgsql") (search/term "postgresql"))))))
+    '(4 5 2 1))
+
+  (test-check "query-terms 3"
+    (receive (cnx ctx) (apply wiredtiger-open* (cons "/tmp/wt" *wsh*))
+      (with-cnx cnx
+        (index ctx "http://example.net" "database")
+        (index ctx "http://example.net" "spam")
+        (index ctx "http://example.net" "egg")
+        (index ctx "http://example.net" "postgresql")
+        (index ctx "http://example.net" "pgsql")
+        (query-terms ctx (search/and (search/term "database") (search/term "spam")
+                                     (search/or (search/term "pgsql") (search/term "postgresql"))
+                                     (search/not (search/term "spam"))))))
+    '(4 5 2 1))
+
   (test-check "search/vm and/or"
     (receive (cnx ctx) (apply wiredtiger-open* (cons "/tmp/wt" *wsh*))
       (with-cnx cnx
@@ -143,6 +218,24 @@
         (search/vm ctx (search/and (search/term "database") (search/or (search/term "postgresql")
                                                                        (search/term "pgsql"))))))
     '(5 1))
+
+  (test-check "search/vm or avoid duplicates"
+    (receive (cnx ctx) (apply wiredtiger-open* (cons "/tmp/wt" *wsh*))
+      (with-cnx cnx
+        (index ctx "http://example.net" "database")
+        (index ctx "http://example.net" "wiredtiger & database")
+        (index ctx "http://example.net" "wiredtiger")
+
+        (search/vm ctx (search/or (search/term "database")
+                                  (search/term "wiredtiger")))))
+    '(2 1 3))
+
+  (test-check "search/vm avoid duplicates"
+    (receive (cnx ctx) (apply wiredtiger-open* (cons "/tmp/wt" *wsh*))
+      (with-cnx cnx
+        (index ctx "http://example.net" "wiredtiger & wiredtiger")
+        (search/vm ctx (search/term "wiredtiger"))))
+    '(1))
 
   (test-check "search/vm and/not"
     (receive (cnx ctx) (apply wiredtiger-open* (cons "/tmp/wt" *wsh*))
@@ -178,7 +271,7 @@
         (search/vm ctx (search/and (search/term "database") (search/not (search/or (search/term "egg")
                                                                                    (search/term "pgsql")))))))
     '(1))
-  
+
   (test-check "search/make-predicate 1"
     (receive (cnx ctx) (apply wiredtiger-open* (cons "/tmp/wt" *wsh*))
       (with-cnx cnx
@@ -189,7 +282,7 @@
         (index ctx "http://example.net" "database & pgsql & spam")
         (let* ((query (search/term "database"))
                (predicate (search/make-predicate ctx query)))
-          
+
           (filter predicate (map (cut + 1 <>) (iota 5))))))
     '(1 4 5))
 
@@ -204,7 +297,7 @@
         (let* ((query (search/and (search/term "database")
                                   (search/term "postgresql")))
                (predicate (search/make-predicate ctx query)))
-          
+
           (filter predicate (map (cut + 1 <>) (iota 5))))))
     '(1))
 
@@ -220,7 +313,22 @@
                                   (search/or (search/term "postgresql")
                                              (search/term "pgsql"))))
                (predicate (search/make-predicate ctx query)))
-          
+
           (filter predicate (map (cut + 1 <>) (iota 5))))))
     '(1 5))
+
+  (test-check "search*"
+    (receive (cnx ctx) (apply wiredtiger-open* (cons "/tmp/wt" *wsh*))
+      (with-cnx cnx
+        (index ctx "http://example.net" "database & postgresql & pgsql")
+        (index ctx "http://example.net" "database & postgresql")
+        (index ctx "http://example.net" "spam & egg")
+        (index ctx "http://example.net" "database & egg")
+        (index ctx "http://example.net" "database & pgsql & spam")
+        (index ctx "http://example.net" "database & postgresql & pgsql & database again")
+        (let ((query (search/and (search/term "database")
+                                 (search/or (search/term "postgresql")
+                                            (search/term "pgsql")))))
+          (search* ctx query))))
+    '((6 . 4) (1 . 3) (5 . 2) (2 . 2)))
   )
