@@ -18,3 +18,4 @@
 ** fix markdown parser cf. wiredtigerz.md
 * wsh
 ** rename search/term, search/and etc... to query/term, query/and etc...
+** test with terms that are not in the database
