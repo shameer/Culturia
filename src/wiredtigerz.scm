@@ -22,6 +22,7 @@
 (define-module (wiredtigerz))
 
 (use-modules (ice-9 match))
+(use-modules (ice-9 threads))
 (use-modules (ice-9 receive))
 (use-modules (ice-9 optargs))
 
@@ -46,6 +47,8 @@
       (datum->syntax ctx (%id-name (syntax->datum name))))
     (define (id-append ctx . syms)
       (datum->syntax ctx (apply symbol-append (map syntax->datum syms))))
+    (define (id-append! ctx . syms)
+      (datum->syntax ctx (symbol-append (apply symbol-append (map syntax->datum syms)) '!)))
     (syntax-case x ()
       ((_ rname field ...)
        (and (identifier? #'rname) (and-map identifier? #'(field ...)))
@@ -53,13 +56,15 @@
                      (pred (id-append #'rname (id-name #'rname #'rname) #'?))
                      ((getter ...) (map (lambda (f)
                                           (id-append f (id-name #'rname #'rname) #'- f))
+                                        #'(field ...)))
+                     ((setter ...) (map (lambda (f)
+                                          (id-append! f (id-name #'rname #'rname) #'- f))
                                         #'(field ...))))
          #'(define-record-type rname
              (cons field ...)
              pred
-             (field getter)
+             (field getter setter)
              ...))))))
-
 
 ;;; helpers
 
@@ -275,6 +280,59 @@ with cursor symbols as key and cursors as value"
                 (list (format #false "index:~a:~a" name (index-name index))))
           (list cursor-name
                 (list (format #false "index:~a:~a(~a)" name (index-name index) columns)))))))
+;;;
+;;; <env>
+;;;
+;;
+;; An environment contains the configuration of a given database and
+;; its contexts. It's threadsafe.
+;;
+
+(define-record-type* <env> connection configs contexts mutex)
+
+(define *context* (make-unbound-fluid))
+
+(define-public (env-open path)
+  (make-env (connection-open path "create") '() '() (make-mutex)))
+
+(define-public (env-close env)
+  (connection-close (env-connection env)))
+
+(define-public (env-config-add env config)
+  (env-configs! env (cons config (env-configs env))))
+
+(define-public (env-create env)
+  (let* ((connection (env-connection env))
+         (session (session-open connection)))
+    (apply session-create* (cons session (env-configs env)))
+    (session-close session)))
+  
+
+(define (get-or-create-context env)
+  (with-mutex (env-mutex env)
+    (let ((contexts (env-contexts env)))
+      (if (null? contexts)
+          ;; create a new context
+          ;; XXX: the number of active context is unbound
+          (apply context-open (cons (env-connection env) (env-configs env)))
+          ;; re-use an existing context
+          (let ((context (car contexts)))
+            (env-contexts! env (cdr contexts))
+            context)))))
+
+(define-syntax-rule (with-context env body ...)
+  (let ((env* env))
+    ;; get or create a context and set it as current *context* value
+    (let ((context (get-or-create-context env)))
+      (with-fluids ((*context* context))
+        ;; execute the body
+        (let ((out (begin body ...)))
+          ;; push back the context to the context pool
+          (with-mutex (env-mutex env*)
+            (env-contexts! env (cons context (env-contexts env))))
+          out)))))
+
+(export with-context)
 
 ;;;
 ;;; <context>
@@ -318,15 +376,15 @@ a two values: the connection and a context"
   "Rollback transaction against CONTEXT"
   (session-transaction-rollback (context-session context)))
 
-(define-syntax-rule (with-transaction context e ...)
+(define-syntax-rule (with-transaction e ...)
   (catch #true
     (lambda ()
-      (context-begin context)
+      (context-begin (fluid-ref *context*))
       (let ((out (begin e ...)))
-        (context-commit context)
+        (context-commit (fluid-ref *context*))
         out))
     (lambda (key . args)
-      (context-rollback context)
+      (context-rollback (fluid-ref *context*))
       (apply throw (cons key args)))))
 
 (export with-transaction)
@@ -347,15 +405,14 @@ a two values: the connection and a context"
 
 (export with-cursor)
 
-(define-syntax-rule (call-with-cursor context name proc)
-  (let ((cursor (context-ref context name)))
+(define-syntax-rule (call-with-cursor name proc)
+  (let* ((context (fluid-ref *context*))
+         (cursor (context-ref context name)))
     (let ((out (proc cursor)))
       (cursor-reset cursor)
         out)))
 
-
 (export call-with-cursor)
-
 
 (define-public (cursor-next* cursor)
   "Move the cursor to the next result and return #t.
@@ -475,6 +532,7 @@ if KEY is not found"
           '()))))
 
 (define-public (cursor-count-prefix cursor . key-prefix)
+  ;; FIXME: only counting keys would improve performance
   (length (apply cursor-range-prefix (cons cursor key-prefix))))
 
 
@@ -709,4 +767,19 @@ if KEY is not found"
             (lambda (key . args)
               #true)))))
     #true)
+
+  (test-check "with-context"
+    (let ((env (env-open "/tmp/wt")))
+      (env-config-add env '(counter ((name . string)) ((value . integer)) ()))
+      (env-create env)
+      (with-cnx (env-connection env)
+        (with-context env
+          (call-with-cursor 'counter
+            (lambda (cursor)
+              (cursor-insert* cursor (list "counter") (list 42)))))
+        (with-context env
+          (call-with-cursor 'counter
+            (lambda (cursor)
+              (cursor-value-ref* cursor "counter"))))))
+    '(42))
   )
