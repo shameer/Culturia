@@ -118,13 +118,13 @@
     (('not . arg) (lambda (hits)
                     (lset-difference eq? hits (search/vm ctx arg))))))
 
-(define (unnest lst)
+(define (flatten lst)
   (let loop ((lst lst)
              (out '()))
     (if (null? lst)
         out
         (if (list? (car lst))
-            (loop (cdr lst) (append (unnest (car lst)) out))
+            (loop (cdr lst) (append (flatten (car lst)) out))
             (loop (cdr lst) (cons (car lst) out))))))
 
 (define (query-terms% ctx query)
@@ -136,7 +136,7 @@
 
 (define (query-terms ctx query)
   "convert QUERY to a list of relevant terms for computing the score"
-  (unnest (query-terms% ctx query)))
+  (flatten (query-terms% ctx query)))
 
 (define (term-frequency ctx term-id doc-id)
   "frequency of TERM-ID in DOC-ID"
