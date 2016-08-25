@@ -29,16 +29,9 @@
 (use-modules (ice-9 receive))  ;; receive
 (use-modules (ice-9 match))  ;; match
 
+(use-modules (uav))
+(use-modules (grf))
 (use-modules (wiredtiger))
-(use-modules (wiredtigerz))
-
-;;;
-;;; Guile helpers
-;;;
-
-;; match helper
-(define-syntax-rule (match-let (value query) e ...)
-  (match query (value e ...)))
 
 
 (define iterator 0)
@@ -68,23 +61,31 @@
 ;;  ("uri" . "/a/[/r/Antonym/,/c/de/achteckstempel/,/c/de/rundstempel/]")
 ;;  ("context" . "/ctx/all"))
 
+(define cnx (uav-open* "/tmp/wt"))
+
+
+(define (add-entry start rel end)
+  (receive (_ start) (vertex-get-or-create 'concept 'name `((name . ,start)))
+    (receive (_ end) (vertex-get-or-create 'concept 'name `((name . ,end)))
+      (edge-add! start (string->symbol rel) end '()))))
+
 (define (add entry)
-  (pk entry))
+  (add-entry (assoc-ref entry "start")
+             (assoc-ref entry "rel")
+             (assoc-ref entry "end")))
 
-(define path "conceptnet/part_0")
+(define path "data/conceptnet/part_0")
 
-(let next-file ((index 0))
-  (let* ((filename (pk (string-append path (number->string index) ".msgpack")))
-         (file (open filename  O_RDONLY)))
-    (let next-entry ((entry (get-unpack file)))
-      (if (eof-object? entry)
-          (unless (equal? index 0)
-            (close file)
-            (set! step 0)
-            (next-file (1+ index)))
-          (begin (iter)
-                 (add entry)
-                 (next-entry (get-unpack file)))))))
-
-
-(connection-close connection)
+(with-cnx cnx
+  (let next-file ((index 0))
+    (let* ((filename (pk (string-append path (number->string index) ".msgpack")))
+           (file (open filename  O_RDONLY)))
+      (let next-entry ((entry (get-unpack file)))
+        (if (eof-object? entry)
+            (unless (equal? index 7)
+              (close file)
+              (set! step 0)
+              (next-file (1+ index)))
+            (begin (iter)
+                   (add entry)
+                   (next-entry (get-unpack file))))))))
