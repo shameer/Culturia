@@ -9,10 +9,6 @@
 ** support signed integers
 * wiredtigerz
 ** improve performance of cursor-count-near
-** It should up to the caller to call cursor-reset, remove it from cursor-range and others
-
-** add support for true mutithreaded context with multiple cursors
-
 * offline use
 * Documentation
 ** fix markdown parser cf. wiredtigerz.md
