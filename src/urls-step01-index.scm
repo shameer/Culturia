@@ -70,4 +70,4 @@
             (cut stream-filter valid? <>)
             (cut stream-map (maybe parse) <>)
             (cut stream-filter valid? <>))
-   (file->scm "data/hn.stories.alpha.scm")))
+   (file->scm "data/hn.stories.scm")))

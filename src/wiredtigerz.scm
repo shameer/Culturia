@@ -301,13 +301,17 @@ with cursor symbols as key and cursors as value"
 (define-public (env-config-add env config)
   (env-configs! env (cons config (env-configs env))))
 
+(define-public (env-open* path configs)
+  (let ((env (env-open path)))
+    (for-each (cut env-config-add env <>) configs)
+    env))
+
 (define-public (env-create env)
   (let* ((connection (env-connection env))
          (session (session-open connection)))
     (apply session-create* (cons session (env-configs env)))
     (session-close session)))
   
-
 (define (get-or-create-context env)
   (with-mutex (env-mutex env)
     (let ((contexts (env-contexts env)))
@@ -333,6 +337,14 @@ with cursor symbols as key and cursors as value"
           out)))))
 
 (export with-context)
+
+(define-syntax-rule (with-env env e ...)
+  (let ((env* env)
+        (out (with-context env e ...)))
+    (env-close env)
+    out))
+
+(export with-env)
 
 ;;;
 ;;; <context>
