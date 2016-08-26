@@ -1,5 +1,3 @@
-(use-modules (wsh))
-(use-modules (wiredtigerz))
 (use-modules (htmlprag))
 (use-modules (http))
 (use-modules (ice-9 match))
@@ -11,6 +9,8 @@
 (use-modules (text))
 (use-modules (uav))
 (use-modules (web response))
+(use-modules (wiredtigerz))
+(use-modules (wsh))
 
 
 (setlocale LC_ALL "")
@@ -37,11 +37,14 @@
   (let ((response (call-with-input-string (cdr pair) read-response)))
     (case (response-code response)
       ((200) (case (car (response-content-type response))
-               ((text/html) (cons (car pair) (utf8->string (read-response-body response))))
+               ((text/html)
+                (cons (car pair) (utf8->string (read-response-body response))))
                (else '())))
-      ((301) '())
-      ((404) '())
-      (else '()))))
+      ((301) (display "r") '())
+      ((302) (display "r") '())
+      ((303) (display "r") '())
+      ((404) (display "n") '())
+      (else (display "x") '()))))
 
 (define (valid? pair)
   (not (null? pair)))
@@ -52,16 +55,19 @@
       (lambda () (with-error-to-file "/dev/null" (lambda () (apply proc args))))
       (lambda _ '()))))
 
-(define (store ctx)
+(define store
   (match-lambda ((url . html)
-                 (index ctx url html)
+                 (index url html)
                  (display "."))))
 
 
-(receive (cnx ctx) (apply wiredtiger-open* (cons "/tmp/wt" *wsh*))
-  (with-cnx cnx
-    ((compose (cut stream-for-each (store ctx) <>)
-              (cut stream-filter valid? <>)
-              (cut stream-map (maybe parse) <>)
-              (cut stream-filter valid? <>))
-     (file->scm "data/hn.stories.alpha.scm"))))
+(define env (env-open "/tmp/wt"))
+(for-each (cut env-config-add env <>) *wsh*)
+(env-create env)
+
+(with-env env
+  ((compose (cut stream-for-each store <>)
+            (cut stream-filter valid? <>)
+            (cut stream-map (maybe parse) <>)
+            (cut stream-filter valid? <>))
+   (file->scm "data/hn.stories.alpha.scm")))
