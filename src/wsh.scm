@@ -53,7 +53,7 @@
 (define (uid->url uid)
   (call-with-cursor 'urls
     (lambda (cursor)
-      (cursor-value-ref* cursor uid))))
+      (car (cursor-value-ref* cursor uid)))))
 
 (define (term-uid term)
   (catch 'wiredtiger
@@ -163,7 +163,8 @@
     (let ((term-ids (query-terms query)))
       ;; score every hits against terms
       (let ((scores (map (cut score term-ids <>) hits)))
-        (sort (map cons hits scores) (lambda (a b) (> (cdr a) (cdr b))) )))))
+        (let ((urls (map uid->url hits)))
+          (sort (map cons urls scores) (lambda (a b) (> (cdr a) (cdr b))) ))))))
 
 ;;;
 ;;; tests
