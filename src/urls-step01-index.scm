@@ -61,7 +61,7 @@
                  (display "."))))
 
 
-(define env (env-open "/tmp/wt"))
+(define env (env-open "data/wt"))
 (for-each (cut env-config-add env <>) *wsh*)
 (env-create env)
 
