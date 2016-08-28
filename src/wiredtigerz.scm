@@ -327,21 +327,21 @@ with cursor symbols as key and cursors as value"
 (define-syntax-rule (with-context env body ...)
   (let ((env* env))
     ;; get or create a context and set it as current *context* value
-    (let ((context (get-or-create-context env)))
+    (let ((context (get-or-create-context env*)))
       (with-fluids ((*context* context))
         ;; execute the body
         (let ((out (begin body ...)))
           ;; push back the context to the context pool
           (with-mutex (env-mutex env*)
-            (env-contexts! env (cons context (env-contexts env))))
+            (env-contexts! env* (cons context (env-contexts env*))))
           out)))))
 
 (export with-context)
 
 (define-syntax-rule (with-env env e ...)
-  (let ((env* env)
-        (out (with-context env e ...)))
-    (env-close env)
+  (let* ((env* env)
+         (out (with-context env* e ...)))
+    (env-close env*)
     out))
 
 (export with-env)
