@@ -13,11 +13,9 @@ basically all of it.
 
 The immediate changes that should happen are in order of preference:
 
-- offline stackoverflow
-
 - port whoosh to guile to improve text search
 
-- offline hackernews, wikidata, wikipedia, wiktionary
+- offline hackernews, wikidata, wikipedia, wiktionary, stackoverflow
 
 Culturia is a reference to
 [Culture and Empire by Pieter Hintjens](http://cultureandempire.com) and
