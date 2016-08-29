@@ -6,7 +6,7 @@ This project started as an exploration of opencog hypergraph database.
 
 Other documents written in the course of this journey:
 
-- [dyna: extending datalog for modern ai](youthful-indiscretion/dyna-extending-datalog-for-modern-ai.htlm)
+- [dyna: extending datalog for modern ai](youthful-indiscretion/dyna-extending-datalog-for-modern-ai.html)
 
 - [opencog overview](youthful-indiscretion/opencog-overview.html)
 

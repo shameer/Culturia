@@ -1,0 +1,32 @@
+<html><head><meta charset="utf-8" /><title>guile-culturia</title><link rel="stylesheet" href="static/normalize.css" /><link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Gentium+Basic" /><link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Open+Sans" /><link rel="stylesheet" href="static/main.css" /></head><body><h1><a href="//hyperdev.fr/projects/culturia">hyperdev.fr/projects/culturia</a></h1><div id="container"><h2>wiredtigerz</h2><p><code>wiredtigerz</code> gather extra procedures to work with <code>guile wiredtiger</code> which aims
+at making the main workflow more obvious.</p><p>It implements a declarative API to create tables with their indices and open
+cursor on them. It provides a few helpers for common patterns.</p><p><code>wiredtigerz</code> module can be found in <a href="https://github.com/amirouche/Culturia/blob/master/culturia/wiredtigerz.scm">culturia repository</a>.</p><h3>Reference API</h3><h4>(session-create* session . configs)</h4><p><code>session-create*</code> will create the tables and indices defined declarativly in
+<code>configs</code>. a <code>config</code> must looks like the following:</p><pre><code>(table-name
+ (key assoc as (column-name . column-type))
+ (value assoc as (column-name . column-type))
+ ((list indices as (indexed-ame (indexed keys) (projections column names)))))</code></pre><p><code>column-type</code> are verbose names for column types:</p><ul><li><p><code>record</code></p></li><li><p><code>string</code></p></li><li><p><code>unsigned-integer</code></p></li><li><p><code>integer</code></p></li><li><p><code>raw</code></p></li></ul><p>An example of a configuration that defines an <code>posts</code> table with <code>uid</code>, <code>title</code>,
+<code>body</code>, <code>published-at</code> fields and one index one <code>published-at</code> with a project
+on <code>uid</code> column:</p><pre><code>(define posts &apos;(posts
+ ((uid . raw))
+ ((title . string) (body . string) (published-at . raw))
+ ((published-at (published-at) (uid)))))</code></pre><p>You can create the table and indices in one call using the following code:</p><pre><code>(define connection (connection-open &quot;/tmp/wiredtigerz&quot; &quot;create&quot;))
+(define session (session-open connection))
+(session-create* session posts)
+(session-close session)</code></pre><h4>(cursor-open* session . configs)</h4><p><code>(cursor-open* session config)</code> will open all the cursors related to a given
+<code>config</code> as an assoc.</p><p>You can open cursors over the table and indices you created using
+<code>session-open*</code>. It use the same syntax and the same table declaration.</p><pre><code>(define connection (connection-open &quot;/tmp/wiredtigerz&quot; &quot;create&quot;))
+(define session (session-open connection))
+(define cursors (cursor-open* session posts))</code></pre><p><code>cursors</code> is an assoc that maps table name as symbol to its cursor and indices
+to their cursor. An extra <em>append</em> cursor will be created if the table has a
+single raw column. Index and append cursors are prefixed by the table name.
+Which means that the above <code>cursors</code> should contain the following keys:</p><pre><code>(list &apos;posts &apos;posts-append &apos;posts-published)</code></pre><p>Mind the fact that keys are symbols. Also <code>posts-published</code> cursor has <code>uid</code> as
+cursor&apos;s value since a projection was done. Leave the field empty for the
+default behavior. If there is no indices, leave the indices list empty.</p><h4>Simple database</h4><h5>(wiredtiger-open path . configs)</h5><p>Open database at <code>path</code>, create tables using <code>configs</code> if necessary and return
+a pair <code>(connection . session)</code> and a <code>cursors</code> assoc as returned
+by <code>cursor-open*</code>.</p><p>This procedure is useful in a context where you don&apos;t plan to use threads.</p><h5>(wiredtiger-close database)</h5><p>Shortcut procedure to close a database where <code>database</code> is a pair of connection
+and session.</p><h4>Context</h4><p>Context is made of <code>&lt;session&gt;</code> and <code>cursors</code> assoc. This is useful in multithread
+settings if you don&apos;t need to open multiple cursors for the same table.</p><h4>(context-open connection . configs)</h4><p><code>cursor-open*</code> sister procedure that will open a session and <code>cursors</code> assoc
+and return a context.</p><h4>(context-session context)</h4><p>Return the session associated with <code>context</code></p><h4>(context-ref context name)</h4><p>Return the cursor <code>name</code> from <code>context</code>.</p><h4>transactions</h4><p>Use <code>(context-begin context)</code>, <code>(context-commit context)</code> and
+<code>(context-rollback context)</code> to work with transactions.</p><p>There is macro helper <code>(with-transaction context e ...)</code> that begin and
+commit a transaction at end.</p><h4>Cursor navigation</h4><h5>(cursor-value-ref* cursor . key)</h5><p>Retreive the value associated with key in cursor.</p><h5>(cursor-insert* cursor key value)</h5><p>Insert <code>value</code> at <code>key</code> using cursor. If <code>key</code> is <code>#nil</code>, insert the <code>value</code>
+directly.</p><h5>(cursor-update* cursor key value)</h5><p>Update <code>key</code> with <code>value</code> using <code>cursor</code>.</p><h5>(cursor-remove* cursor . key)</h5><p>Remove <code>key</code> using <code>cursor</code>.</p><h5>(cursor-search* cursor . key)</h5><p>Search <code>key</code> using <code>cursor</code>.</p><h5>(cursor-search-near* cursor . key-prefix)</h5><p>Prepare <code>cursor</code> for forward search using <code>key-prefix</code>.</p><h5>(cursor-range cursor . key-prefix)</h5><p>Return the list of key/value pairs that match <code>key-prefix</code> using <code>cursor</code>.</p></div><p><small>cc-by-nc-sa</small></p></body></html>

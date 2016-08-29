@@ -49,69 +49,6 @@ Notes taking algorithm:
 - Applications
 - Roadmap
 
-**The current (borked) table of content**
-
-<!-- markdown-toc start - Don't edit this section. Run M-x markdown-toc-generate-toc again -->
-**Table of Contents**
-
-- [Introduction](#introduction)
-    - [AI vs AGI](#ai-vs-agi)
-    - [{Open, Cog, Prime}](#open-cog-prime)
-    - [What Kind of Intelligence is OpenCog Aimed At?](#what-kind-of-intelligence-is-opencog-aimed-at)
-    - [What's the secret sauce](#whats-the-secret-sauce)
-    - [Key Claims](#key-claims)
-- [Theory](#theory)
-    - [Pattern based theory of the mind](#pattern-based-theory-of-the-mind)
-        - [What is a pattern?](#what-is-a-pattern)
-        - [What is intelligence?](#what-is-intelligence)
-        - [Which patterns?](#which-patterns)
-        - [How are organized those patterns?](#how-are-organized-those-patterns)
-    - [Mind-World Correspondence Principle](#mind-world-correspondence-principle)
-    - [High-Level Architecture of CogPrime](#high-level-architecture-of-cogprime)
-    - [Local, Global and Glocal](#local-global-and-glocal)
-- [OpenCog framework](#opencog-framework)
-    - [Natural Language Processing Pipeline](#natural-language-processing-pipeline)
-    - [Weigthed, Labeled Hypergraph: AtomSpace](#weigthed-labeled-hypergraph-atomspace)
-        - [Atoms: Types and Weights](#atoms-types-and-weights)
-            - [Atoms](#atoms)
-            - [Truth Values and Attention Values](#truth-values-and-attention-values)
-        - [Glocal Memory](#glocal-memory)
-        - [Memory Types and Associated Cognitive Processes in CogPrime](#memory-types-and-associated-cognitive-processes-in-cogprime)
-            - [Cognitive Synergy in Probabilistic Logic Network](#cognitive-synergy-in-probabilistic-logic-network)
-        - [Goal-Oriented Dynamics](#goal-oriented-dynamics)
-        - [Clarifying the Key Claims](#clarifying-the-key-claims)
-            - [Mutli-Memory Systems](#mutli-memory-systems)
-            - [Preception, Action and Environment](#preception-action-and-environment)
-            - [Developmental Pathways](#developmental-pathways)
-            - [Knowledge Representation](#knowledge-representation)
-            - [Cognitive Processes](#cognitive-processes)
-                - [Uncertain Logic for Declarative Knowledge](#uncertain-logic-for-declarative-knowledge)
-                - [Program Learning for Procedural Knowledge](#program-learning-for-procedural-knowledge)
-                - [Attention Allocation](#attention-allocation)
-                - [Internal Simulation and Episodic Knowledge](#internal-simulation-and-episodic-knowledge)
-                - [Low-Level Perception and Action](#low-level-perception-and-action)
-                - [Goals](#goals)
-                - [Fulfilling the Cognitive Equation](#fulfilling-the-cognitive-equation)
-                - [Occam's Razor](#occams-razor)
-                - [Cognitive Synergy](#cognitive-synergy)
-                    - [Synergies that Help Inference](#synergies-that-help-inference)
-                    - [Synergies that Help MOSES](#synergies-that-help-moses)
-                - [Synergies that Help Attention Allocation](#synergies-that-help-attention-allocation)
-                - [Further Synergies Related to Pattern Mining](#further-synergies-related-to-pattern-mining)
-                - [Synergies Related to Map Formation](#synergies-related-to-map-formation)
-            - [Emergent Structures and Dynamics](#emergent-structures-and-dynamics)
-- [Applications](#applications)
-    - [Virtual Agents](#virtual-agents)
-    - [Physical Robot](#physical-robot)
-    - [Build Me Something I Haven't Seen Before](#build-me-something-i-havent-seen-before)
-- [Roadmap](#roadmap)
-    - [Measuring Progress toward AGI](#measuring-progress-toward-agi)
-    - [Technical Roadmap](#technical-roadmap)
-- [Glossary](#glossary)
-- [Links](#links)
-
-<!-- markdown-toc end -->
-
 # Introduction
 
 ## AI vs AGI
@@ -208,7 +145,9 @@ An AGI system must:
    - [heterarchical network](https://en.wikipedia.org/wiki/Heterarchy) *of
      associativity, roughly aligned with the hierarchical network*
    - *self network which is an approximate micro image of the whole network*
-   - *inter-reflecting networks modeling self and others, reflecting a “mirrorhouse” design pattern* [reference: Mirror Neurons, Mirrorhouses, and the Algebraic Structure of the Self GASP08].
+   - *inter-reflecting networks modeling self and others, reflecting a
+     “mirrorhouse” design pattern*
+     [reference: Mirror Neurons, Mirrorhouses, and the Algebraic Structure of the Self GASP08].
 - implement a simplicity bias in each cognitive process cf. [Occam’s Razor](https://en.wikipedia.org/wiki/Occam's_razor).
 - if supplied with a commonsensically ethical goal system and an intentional
    component based on rigorous uncertain inference, should be able to reliably
@@ -231,18 +170,49 @@ it should do it, describing all the components of OpenCog]
 
 Given the strengths and weaknesses of current and near-future digital computers:
 
-- *a (loosely) neural-symbolic network is a good representation for directly storing many kinds of memory, and interfacing between those that it doesn’t store directly;*
-- *Uncertain logic is a good way to handle declarative knowledge. To deal with the problems facing a human-level AGI, an uncertain logic must integrate imprecise probability and fuzziness with a broad scope of logical constructs. [PLN](http://wiki.opencog.org/wikihome/index.php/Probabilistic_Logic_Networks) is one good realization.*
-- *Programs are a good way to represent procedures (both cognitive and physical-action, but perhaps not including low-level motor-control procedures).*
-- *Evolutionary program learning is a good way to handle difficult program learning problems. Probabilistic learning on normalized programs is one effective approach to evolutionary program learning. [MOSES](http://wiki.opencog.org/wikihome/index.php/Meta-Optimizing_Semantic_Evolutionary_Search) is one good realization of this approach.*
-- Multistart hill-climbing, with a strong Occam prior, is a good way to handle relatively straightforward program learning problems.
-- Activation spreading and Hebbian learning comprise a reasonable way to handle attentional knowledge (though other approaches, with greater overhead cost, may provide better accuracy and may be appropriate in some situations).
-  - Artificial economics is an effective approach to activation spreading and Hebbian learning in the context of neural-symbolic networks; 
-  - ECAN is one good realization of artificial economics; 
-  - A good trade-off between comprehensiveness and efficiency is to focus on two kinds of attention: processor attention (represented in CogPrime by ShortTermImportance) and memory attention (represented in CogPrime by LongTermImportance).
-- Simulation is a good way to handle episodic knowledge (remembered and imagined). Running an internal world simulation engine is an effective way to handle simulation. 
-- Hybridization of one’s integrative neural-symbolic system with a spatiotemporally hierarchical deep learning system is an effective way to handle representation and learning of low-level sensorimotor knowledge. DeSTIN is one example of a deep learning system of this nature that can be effective in this context. 
-- One effective way to handle goals is to represent them declaratively, and allocate attention among them economically. CogPrime ’s PLN/ECAN based framework for handling intentional knowledge is one good realization.
+- *a (loosely) neural-symbolic network is a good representation for
+  directly storing many kinds of memory, and interfacing between those
+  that it doesn’t store directly;*
+- *Uncertain logic is a good way to handle declarative knowledge. To
+  deal with the problems facing a human-level AGI, an uncertain logic
+  must integrate imprecise probability and fuzziness with a broad
+  scope of logical
+  constructs. [PLN](http://wiki.opencog.org/wikihome/index.php/Probabilistic_Logic_Networks)
+  is one good realization.*
+- *Programs are a good way to represent procedures (both cognitive and
+  physical-action, but perhaps not including low-level motor-control
+  procedures).*
+- *Evolutionary program learning is a good way to handle difficult
+  program learning problems. Probabilistic learning on normalized
+  programs is one effective approach to evolutionary program
+  learning. [MOSES](http://wiki.opencog.org/wikihome/index.php/Meta-Optimizing_Semantic_Evolutionary_Search)
+  is one good realization of this approach.*
+- Multistart hill-climbing, with a strong Occam prior, is a good way
+  to handle relatively straightforward program learning problems.
+- Activation spreading and Hebbian learning comprise a reasonable way
+  to handle attentional knowledge (though other approaches, with
+  greater overhead cost, may provide better accuracy and may be
+  appropriate in some situations).
+  - Artificial economics is an effective approach to activation
+    spreading and Hebbian learning in the context of neural-symbolic
+    networks;
+  - ECAN is one good realization of artificial economics;
+  - A good trade-off between comprehensiveness and efficiency is to
+    focus on two kinds of attention: processor attention (represented
+    in CogPrime by ShortTermImportance) and memory attention
+    (represented in CogPrime by LongTermImportance).
+- Simulation is a good way to handle episodic knowledge (remembered
+  and imagined). Running an internal world simulation engine is an
+  effective way to handle simulation.
+- Hybridization of one’s integrative neural-symbolic system with a
+  spatiotemporally hierarchical deep learning system is an effective
+  way to handle representation and learning of low-level sensorimotor
+  knowledge. DeSTIN is one example of a deep learning system of this
+  nature that can be effective in this context.
+- One effective way to handle goals is to represent them
+  declaratively, and allocate attention among them
+  economically. CogPrime ’s PLN/ECAN based framework for handling
+  intentional knowledge is one good realization.
 
 [Missing reference to [Relex](http://wiki.opencog.org/wikihome/index.php/RelEx_Dependency_Relationship_Extractor) and GrammarLink]
 
@@ -675,15 +645,25 @@ to effective real-world approaches.
 
 #### Developmental Pathways
 
-One important case of learning that human children are particularly good at is language learning; It is very tempting to give AGI systems a “short cut” to language proficiency via making use of existing rule-based and statistical-corpus-analysis-based NLP systems;
+One important case of learning that human children are particularly
+good at is language learning; It is very tempting to give AGI systems
+a “short cut” to language proficiency via making use of existing
+rule-based and statistical-corpus-analysis-based NLP systems;
 
 #### Knowledge Representation
 
-The key goal for a knowledge representation for AGI should be naturalness with respect to the AGI’s cognitive processes – i.e. the cognitive processes shouldn’t need to undergo complex transformative gymnastics to get information in and out of the knowledge representation in order to do their cognitive work.
+The key goal for a knowledge representation for AGI should be
+naturalness with respect to the AGI’s cognitive processes – i.e. the
+cognitive processes shouldn’t need to undergo complex transformative
+gymnastics to get information in and out of the knowledge
+representation in order to do their cognitive work.
 
-A neural-symbolic network is a good representation for directly storing many
-kinds of memory, and interfacing between those that it doesn’t store directly
-AtomSpace is a neural-symbolic network designed to work nicely with PLN, MOSES, ECAN and the other key CogPrime cognitive processes; it supplies them with what they need without causing them undue complexities.
+A neural-symbolic network is a good representation for directly
+storing many kinds of memory, and interfacing between those that it
+doesn’t store directly AtomSpace is a neural-symbolic network designed
+to work nicely with PLN, MOSES, ECAN and the other key CogPrime
+cognitive processes; it supplies them with what they need without
+causing them undue complexities.
 
 #### Cognitive Processes
 
@@ -695,16 +675,24 @@ some cognitive process spans multiple memory.
 
 ##### Uncertain Logic for Declarative Knowledge
 
-The PLN logic framework is one way of integrating imprecise probability and fuzziness in a logical formalism that encompasses a broad scope of logical constructs.
+The PLN logic framework is one way of integrating imprecise
+probability and fuzziness in a logical formalism that encompasses a
+broad scope of logical constructs.
 
 It integrates term logic and predicate logic
 
 ##### Program Learning for Procedural Knowledge
 
-In designing CogPrime , we have acted based on the understanding that programs are a good way to represent procedures – including both cognitive and physical-action procedures, but perhaps not including low-level motor-control procedures.
+In designing CogPrime , we have acted based on the understanding that
+programs are a good way to represent procedures – including both
+cognitive and physical-action procedures, but perhaps not including
+low-level motor-control procedures.
 
-Using a special language called Combo that is essentially a minor variant of
-LISP. What differentiates this use of LISP from many traditional uses of LISP in AI is that we are only using the LISP-ish representational style for procedural knowledge, rather than trying to use it for everything. 
+Using a special language called Combo that is essentially a minor
+variant of LISP. What differentiates this use of LISP from many
+traditional uses of LISP in AI is that we are only using the LISP-ish
+representational style for procedural knowledge, rather than trying to
+use it for everything.
 
 Low level procedures are represented using DeSTIN.
 
@@ -734,29 +722,54 @@ In the context of a neural-symbolic network, artificial economics is an
 effective approach to activation spreading; and CogPrime’s ECAN framework seeks
 to embody this idea.
 
-One major choice made in the CogPrime design is to focus on two kinds of attention: processor (represented by ShortTermImportance) and memory (represented by LongTermImportance)
+One major choice made in the CogPrime design is to focus on two kinds
+of attention: processor (represented by ShortTermImportance) and
+memory (represented by LongTermImportance)
 
 ##### Internal Simulation and Episodic Knowledge
 
-Simulation is a good way to handle episodic knowledge; and running an internal “world simulation engine” is an effective way to handle simulation. 
+Simulation is a good way to handle episodic knowledge; and running an
+internal “world simulation engine” is an effective way to handle
+simulation.
 
 ##### Low-Level Perception and Action
 
-Hybridization of one’s integrative neural-symbolic system with a spatiotemporally hierarchical deep learning system is an effective way to handle representation and learning of low-level sensorimotor knowledge. DeSTIN is one example of a deep learning system of this nature that can be effective in this context.
+Hybridization of one’s integrative neural-symbolic system with a
+spatiotemporally hierarchical deep learning system is an effective way
+to handle representation and learning of low-level sensorimotor
+knowledge. DeSTIN is one example of a deep learning system of this
+nature that can be effective in this context.
 
 ##### Goals
 
-Given that we have characterized general intelligence as “the ability to achieve complex goals in complex environments,” However, we have chosen not to create a separate subsystem for intentional knowledge, and instead have concluded that one effective way to handle goals is to represent them declaratively, and allocate attention among them economically.
+Given that we have characterized general intelligence as “the ability
+to achieve complex goals in complex environments,” However, we have
+chosen not to create a separate subsystem for intentional knowledge,
+and instead have concluded that one effective way to handle goals is
+to represent them declaratively, and allocate attention among them
+economically.
 
-Goals and subgoals are related using logical links as interpreted and manipulated by PLN, and attention is allocated among goals using the STI dynamics of ECAN, and a specialized variant.
+Goals and subgoals are related using logical links as interpreted and
+manipulated by PLN, and attention is allocated among goals using the
+STI dynamics of ECAN, and a specialized variant.
 
-Thus the mechanics of goal management is handled using uncertain inference and artificial economics, whereas the figuring-out of how to achieve goals is done integratively, relying heavily on procedural and episodic knowledge as well as PLN and ECAN.
+Thus the mechanics of goal management is handled using uncertain
+inference and artificial economics, whereas the figuring-out of how to
+achieve goals is done integratively, relying heavily on procedural and
+episodic knowledge as well as PLN and ECAN.
 
-The combination of ECAN and PLN seems to overcome the well-known shortcomings found with purely neural-net or purely inferential approaches to goals. Neural net approaches generally have trouble with abstraction, whereas logical approaches are generally poor at real-time responsiveness and at tuning their details quantitatively based on experience.
+The combination of ECAN and PLN seems to overcome the well-known
+shortcomings found with purely neural-net or purely inferential
+approaches to goals. Neural net approaches generally have trouble with
+abstraction, whereas logical approaches are generally poor at
+real-time responsiveness and at tuning their details quantitatively
+based on experience.
 
 ##### Fulfilling the Cognitive Equation
 
-It is important for an intelligent system to have some way of recognizing large-scale patterns in itself, and then embodying these patterns as new, localized knowledge items in its memory.
+It is important for an intelligent system to have some way of
+recognizing large-scale patterns in itself, and then embodying these
+patterns as new, localized knowledge items in its memory.
 
 This dynamic introduces a feedback dynamic between emergent pattern and
 substrate, which is critical to general intelligence. It also ties in nicely
@@ -777,20 +790,34 @@ invoked.
 
 ##### Occam's Razor
 
-this quest for simplicity is present in many places throughout the CogPrime design, for instance
+This quest for simplicity is present in many places throughout the
+CogPrime design, for instance
 
-- In MOSES and hillclimbing, where program compactness is an explicit component of program tree fitness
-- In PLN, where the backward and forward chainers explicitly favor shorter proof chains, and intensional inference explicitly characterizes entities in terms of their patterns (where patterns are defined as compact characterizations)
+- In MOSES and hillclimbing, where program compactness is an explicit
+  component of program tree fitness
+- In PLN, where the backward and forward chainers explicitly favor
+  shorter proof chains, and intensional inference explicitly
+  characterizes entities in terms of their patterns (where patterns
+  are defined as compact characterizations)
 - In pattern mining heuristics, which search for compact characterizations of data
-- In the forgetting mechanism, which seeks the smallest set of Atoms that will allow the regeneration of a larger set of useful Atoms via modestly-expensive application of cognitive processes
-- Via the encapsulation of procedural and declarative knowledge in simulations, which in many cases provide a vastly compacted form of storing real-world experiences 
+- In the forgetting mechanism, which seeks the smallest set of Atoms
+  that will allow the regeneration of a larger set of useful Atoms via
+  modestly-expensive application of cognitive processes
+- Via the encapsulation of procedural and declarative knowledge in
+  simulations, which in many cases provide a vastly compacted form of
+  storing real-world experiences
 
-Like cognitive synergy and emergent networks, Occam’s Razor is not something that is implemented in a single place in the CogPrime design, but rather an overall design principle that underlies nearly every part of the system. 
+Like cognitive synergy and emergent networks, Occam’s Razor is not
+something that is implemented in a single place in the CogPrime
+design, but rather an overall design principle that underlies nearly
+every part of the system.
 
 ##### Cognitive Synergy
 
-These synergies are absolutely critical to the proposed functionality of the CogPrime system.
-Without them, the cognitive mechanisms are not going to work adequately well, but are rather going to succumb to combinatorial explosions.
+These synergies are absolutely critical to the proposed functionality
+of the CogPrime system.  Without them, the cognitive mechanisms are
+not going to work adequately well, but are rather going to succumb to
+combinatorial explosions.
 
 The other aspects of CogPrime - the cognitive architecture, the knowledge
 representation, the embodiment framework and associated developmental teaching
@@ -823,41 +850,146 @@ available options is unrealistic.
 
 ###### Synergies that Help MOSES
 
-MOSES’s combinatorial explosion is obvious: the number of possible programs of size N increases very rapidly with N. The only way to get around this is to utilize prior knowledge, and as much as possible of it. When solving a particular problem, the search for new solutions must make use of prior candidate solutions evaluated for that problem, and also prior candidate solutions (including successful and unsuccessful ones) evaluated for other related problems.
+MOSES’s combinatorial explosion is obvious: the number of possible
+programs of size N increases very rapidly with N. The only way to get
+around this is to utilize prior knowledge, and as much as possible of
+it. When solving a particular problem, the search for new solutions
+must make use of prior candidate solutions evaluated for that problem,
+and also prior candidate solutions (including successful and
+unsuccessful ones) evaluated for other related problems.
 
-But, extrapolation of this kind is in essence a contextual analogical inference problem. In some cases it can be solved via fairly straightforward pattern mining; but in subtler cases it will require inference of the type provided by PLN. Also, attention allocation plays a role in figuring out, for a given problem A, which problems B are likely to have the property that candidate solutions for B are useful information when looking for better solutions for A.
+But, extrapolation of this kind is in essence a contextual analogical
+inference problem. In some cases it can be solved via fairly
+straightforward pattern mining; but in subtler cases it will require
+inference of the type provided by PLN. Also, attention allocation
+plays a role in figuring out, for a given problem A, which problems B
+are likely to have the property that candidate solutions for B are
+useful information when looking for better solutions for A.
 
 ##### Synergies that Help Attention Allocation
 
-Economic attention allocation, without help from other cognitive processes, is just a very simple process analogous to “activation spreading” and “Hebbian learning” in a neural network. The other cognitive processes are the things that allow it to more sensitively understand the attentional relationships between different knowledge items (e.g. which sorts of items are often usefully thought about in the same context, and in which order).
+Economic attention allocation, without help from other cognitive
+processes, is just a very simple process analogous to “activation
+spreading” and “Hebbian learning” in a neural network. The other
+cognitive processes are the things that allow it to more sensitively
+understand the attentional relationships between different knowledge
+items (e.g. which sorts of items are often usefully thought about in
+the same context, and in which order).
 
 #####  Further Synergies Related to Pattern Mining
 
 [Further Synergies Related to Pattern Mining]
 
-Statistical, greedy pattern mining is a simple process, but it nevertheless can be biased in various ways by other, more subtle processes.
+Statistical, greedy pattern mining is a simple process, but it
+nevertheless can be biased in various ways by other, more subtle
+processes.
 
-For instance, if one has learned a population of programs via MOSES, addressing some particular fitness function, then one can study which items tend to be utilized in the same programs in this population. One may then direct pattern mining to find patterns combining these items found to be in the MOSES population. And conversely, relationships denoted by pattern mining may be used to probabilistically bias the models used within MOSES.
+For instance, if one has learned a population of programs via MOSES,
+addressing some particular fitness function, then one can study which
+items tend to be utilized in the same programs in this population. One
+may then direct pattern mining to find patterns combining these items
+found to be in the MOSES population. And conversely, relationships
+denoted by pattern mining may be used to probabilistically bias the
+models used within MOSES.
 
-Statistical pattern mining may also help PLN by supplying it with information to work on. For instance, conjunctive pattern mining finds conjunctions of items, which may then be combined with each other using PLN, leading to the formation of more complex predicates. These conjunctions may also be fed to MOSES as part of an initial population for solving a relevant problem.
+Statistical pattern mining may also help PLN by supplying it with
+information to work on. For instance, conjunctive pattern mining finds
+conjunctions of items, which may then be combined with each other
+using PLN, leading to the formation of more complex predicates. These
+conjunctions may also be fed to MOSES as part of an initial population
+for solving a relevant problem.
 
-Finally, the main interaction between pattern mining and MOSES/PLN is that the former may recognize patterns in links created by the latter. These patterns may then be fed back into MOSES and PLN as data. This virtuous cycle allows pattern mining and the other, more expensive cognitive processes to guide each other. Attention allocation also gets into the game, by guiding statistical pattern mining and telling it which terms (and which combinations) to spend more time on.
+Finally, the main interaction between pattern mining and MOSES/PLN is
+that the former may recognize patterns in links created by the
+latter. These patterns may then be fed back into MOSES and PLN as
+data. This virtuous cycle allows pattern mining and the other, more
+expensive cognitive processes to guide each other. Attention
+allocation also gets into the game, by guiding statistical pattern
+mining and telling it which terms (and which combinations) to spend
+more time on.
 
 ##### Synergies Related to Map Formation
 
 [Synergies Related to Map Formation]
 
-The essential synergy regarding map formation is obvious: Maps are formed based on the HebbianLinks created via PLN and simpler attentional dynamics, which are based on which Atoms are usefully used together, which is based on the dynamics of the cognitive processes doing the “using.” On the other hand, once maps are formed and encapsulated, they feed into these other cognitive processes. This synergy in particular is critical to the emergence of self and attention.
+The essential synergy regarding map formation is obvious: Maps are
+formed based on the HebbianLinks created via PLN and simpler
+attentional dynamics, which are based on which Atoms are usefully used
+together, which is based on the dynamics of the cognitive processes
+doing the “using.” On the other hand, once maps are formed and
+encapsulated, they feed into these other cognitive processes. This
+synergy in particular is critical to the emergence of self and
+attention.
 
-What has to happen, for map formation to work well, is that the cognitive processes must utilize encapsulated maps in a way that gives rise overall to relatively clear clusters in the network of HebbianLinks. This will happen if the encapsulated maps are not too complex for the system’s other learning operations to understand. So, there must be useful coordinated attentional patterns whose corresponding encapsulated-map Atoms are not too complicated. This has to do with the system’s overall parameter settings, but largely with the settings of the attention allocation component. For instance, this is closely tied in with the limited size of “attentional focus” (the famous 7 +/- 2 number associated with humans’ and other mammals short term memory capacity). If only a small number of Atoms are typically very important at a given point in time, then the maps formed by grouping together all simultaneously highly important things will be relatively small predicates, which will be easily reasoned about - thus keeping the “virtuous cycle” of map formation and comprehension going effectively.
+What has to happen, for map formation to work well, is that the
+cognitive processes must utilize encapsulated maps in a way that gives
+rise overall to relatively clear clusters in the network of
+HebbianLinks. This will happen if the encapsulated maps are not too
+complex for the system’s other learning operations to understand. So,
+there must be useful coordinated attentional patterns whose
+corresponding encapsulated-map Atoms are not too complicated. This has
+to do with the system’s overall parameter settings, but largely with
+the settings of the attention allocation component. For instance, this
+is closely tied in with the limited size of “attentional focus” (the
+famous 7 +/- 2 number associated with humans’ and other mammals short
+term memory capacity). If only a small number of Atoms are typically
+very important at a given point in time, then the maps formed by
+grouping together all simultaneously highly important things will be
+relatively small predicates, which will be easily reasoned about -
+thus keeping the “virtuous cycle” of map formation and comprehension
+going effectively.
 
 #### Emergent Structures and Dynamics
 
-We have spent much more time in this book on the engineering of cognitive processes and structures, than on the cognitive processes and structures that must emerge in an intelligent system for it to display human-level AGI. However, this focus should not be taken to represent a lack of appreciation for the importance of emergence. Rather, it represents a practical focus: engineering is what we must do to create a software system potentially capable of AGI, and emergence is then what happens inside the engineered AGI to allow it to achieve intelligence. Emergence must however be taken carefully into account when deciding what to engineer!
+We have spent much more time in this book on the engineering of
+cognitive processes and structures, than on the cognitive processes
+and structures that must emerge in an intelligent system for it to
+display human-level AGI. However, this focus should not be taken to
+represent a lack of appreciation for the importance of
+emergence. Rather, it represents a practical focus: engineering is
+what we must do to create a software system potentially capable of
+AGI, and emergence is then what happens inside the engineered AGI to
+allow it to achieve intelligence. Emergence must however be taken
+carefully into account when deciding what to engineer!
 
-One of the guiding ideas underlying the CogPrime design is that an AGI system with adequate mechanisms for handling the key types of knowledge mentioned above, and the capability to explicitly recognize large-scale pattern in itself, should upon sustained interaction with an appropriate environment in pursuit of appropriate goals, emerge a variety of complex structures in its internal knowledge network, including (but not limited to): a hierarchical network, representing both a spatiotemporal hierarchy and an approximate “default inheritance” hierarchy, cross-linked; a heterarchical network of associativity, roughly aligned with the hierarchical network; a self network which is an approximate micro image of the whole network; and inter-reflecting networks modeling self and others, reflecting a “mirrorhouse” design pattern.
+One of the guiding ideas underlying the CogPrime design is that an AGI
+system with adequate mechanisms for handling the key types of
+knowledge mentioned above, and the capability to explicitly recognize
+large-scale pattern in itself, should upon sustained interaction with
+an appropriate environment in pursuit of appropriate goals, emerge a
+variety of complex structures in its internal knowledge network,
+including (but not limited to): a hierarchical network, representing
+both a spatiotemporal hierarchy and an approximate “default
+inheritance” hierarchy, cross-linked; a heterarchical network of
+associativity, roughly aligned with the hierarchical network; a self
+network which is an approximate micro image of the whole network; and
+inter-reflecting networks modeling self and others, reflecting a
+“mirrorhouse” design pattern.
 
-The dependence of these posited emergences on the environment and goals of the AGI system should not be underestimated. For instance, PLN and pattern mining don’t have to lead to a hierarchical structured AtomSpace. But if the AGI system is placed in an environment which it hierarchically structured via its own efforts, thenPLN and pattern mining very likely will lead to a hierarchically structured AtomSpace. And if this environment consists of hierarchically structured language and culture, then what one has is a system of minds with hierarchical networks, each reinforcing the hierarchality of each others’ networks. Similarly, integrated cognition doesn’t have to lead to mirrorhouse structures, but integrated cognition about situations involving other minds studying and predicting and judging each other, is very likely to do so. What is needed for appropriate emergent structures to arise in a mind, is mainly that the knowledge representation is sufficiently flexible to allow these structures, and the cognitive processes are sufficiently intelligent to observe these structures in the environment and then mirror them internally. Of course, it also doesn’t hurt if the internal structures and processes are at least slightly biased toward the origination of the particular high-level emergent structures that are characteristic of the system’s environment/goals; and this is indeed the case with CogPrime ... biases toward hierarchical, heterarchical, dual and mirrorhouse networks are woven throughout the system design, in a thoroughgoing though not extremely systematic way.
+The dependence of these posited emergences on the environment and
+goals of the AGI system should not be underestimated. For instance,
+PLN and pattern mining don’t have to lead to a hierarchical structured
+AtomSpace. But if the AGI system is placed in an environment which it
+hierarchically structured via its own efforts, thenPLN and pattern
+mining very likely will lead to a hierarchically structured
+AtomSpace. And if this environment consists of hierarchically
+structured language and culture, then what one has is a system of
+minds with hierarchical networks, each reinforcing the hierarchality
+of each others’ networks. Similarly, integrated cognition doesn’t have
+to lead to mirrorhouse structures, but integrated cognition about
+situations involving other minds studying and predicting and judging
+each other, is very likely to do so. What is needed for appropriate
+emergent structures to arise in a mind, is mainly that the knowledge
+representation is sufficiently flexible to allow these structures, and
+the cognitive processes are sufficiently intelligent to observe these
+structures in the environment and then mirror them internally. Of
+course, it also doesn’t hurt if the internal structures and processes
+are at least slightly biased toward the origination of the particular
+high-level emergent structures that are characteristic of the system’s
+environment/goals; and this is indeed the case with CogPrime
+... biases toward hierarchical, heterarchical, dual and mirrorhouse
+networks are woven throughout the system design, in a thoroughgoing
+though not extremely systematic way.
 
 # Applications
 
@@ -961,7 +1093,6 @@ http://wiki.opencog.org/wikihome/index.php/Roadmap
 - Probabilitstic Logic Network (PLN): uncertain inference framework
 - Procedural Learning
 - ReLex
-- 
 
 # Links
 

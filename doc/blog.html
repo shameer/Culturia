@@ -1,25 +1,21 @@
-<html><head><meta charset="utf-8" /><title>guile-culturia</title><link rel="stylesheet" href="static/normalize.css" /><link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Gentium+Basic" /><link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Open+Sans" /><link rel="stylesheet" href="static/main.css" /></head><body><h1><a href="//hyperdev.fr/projects/culturia">hyperdev.fr/projects/culturia</a></h1><div id="container"><h2>Blog</h2><h3>0.0 - Youthful Indiscretion</h3><p>This project started as an exploration of opencog hypergraph database.</p><p>Other documents written in the course of this journey:</p><p>- <a href="youthful-indiscretion/dyna-extending-datalog-for-modern-ai.htlm">dyna: extending datalog for modern ai</a></p><p>- <a href="youthful-indiscretion/opencog-overview.html">opencog overview</a></p><p>- <a href="youthful-indiscretion/udacity-knowledge-based-ai.html">knowledge based ai (udacity)</a></p><h4>2015/09/22 - What Are The Civilian Applications?</h4><p>I started the the implementation and pushed some code. This includes
+<html><head><meta charset="utf-8" /><title>guile-culturia</title><link rel="stylesheet" href="static/normalize.css" /><link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Gentium+Basic" /><link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Open+Sans" /><link rel="stylesheet" href="static/main.css" /></head><body><h1><a href="//hyperdev.fr/projects/culturia">hyperdev.fr/projects/culturia</a></h1><div id="container"><h2>Blog</h2><h3>0.0 - Youthful Indiscretion</h3><p>This project started as an exploration of opencog hypergraph database.</p><p>Other documents written in the course of this journey:</p><ul><li><p><a href="youthful-indiscretion/dyna-extending-datalog-for-modern-ai.html">dyna: extending datalog for modern ai</a></p></li><li><p><a href="youthful-indiscretion/opencog-overview.html">opencog overview</a></p></li><li><p><a href="youthful-indiscretion/udacity-knowledge-based-ai.html">knowledge based ai (udacity)</a></p></li></ul><h4>2015/09/22 - What Are The Civilian Applications?</h4><p>I started the the implementation and pushed some code. This includes
 FFI bindings of wiredtiger with documentation and a few examples (that
 may not work as-is). The best way to get started with wiredtiger is to
 read
-<a href="http://source.wiredtiger.com/2.6.1/schema.html">Schema, Columns, Column Groups, Indices and Projections</a>.</p><h4>2015/09/27 - Well I Was In The Neighbourhood</h4><p>I tried several designs that includes:</p><p><b>version control system</b>: this works using copy-on-write and
-filtering stored atoms by <i>revision path</i>. Things that must be taken
-into account:</p><p>- moving from one &quot;workspace&quot; to another. This requires to remove all
-  changes that have been done in the &quot;workspace&quot;. Other bookeeping
-  scheme like transaction/multiple state revision so that it&apos;s
-  possible for several thread to work on different <i>workspace</i>.</p><p>- and more interestingly provide an API that allows to browser the
-  history of a single node and continue graph exploration from there.
-  
-<b>hierarchical hypergraph</b>: Simple hypergraph inheritance can use a
+<a href="http://source.wiredtiger.com/2.6.1/schema.html">Schema, Columns, Column Groups, Indices and Projections</a>.</p><h4>2015/09/27 - Well I Was In The Neighbourhood</h4><p>I tried several designs that includes:</p><p><strong>version control system</strong>: this works using copy-on-write and
+filtering stored atoms by <em>revision path</em>. Things that must be taken
+into account:</p><ul><li><p>moving from one &quot;workspace&quot; to another. This requires to remove all
+changes that have been done in the &quot;workspace&quot;. Other bookeeping
+scheme like transaction/multiple state revision so that it&apos;s
+possible for several thread to work on different <em>workspace</em>.</p></li><li><p>and more interestingly provide an API that allows to browser the
+history of a single node and continue graph exploration from there.</p></li></ul><p><strong>hierarchical hypergraph</strong>: Simple hypergraph inheritance can use a
 similar model to version control system. You build a tree (or
 forest) using a set of tuples then that you cache in memory. Then
 when fetching atoms, you check that those atoms are part of the
-correct <i>tree branch path</i>
-  
-- <i>multiple parents hypergraph</i>: extending the above allowing parent atoms to
-have multiple parents. Not sure what the use of this</p><p>I end up thinking really about recursive hypergraph where atoms could
+correct <em>tree branch path</em></p><ul><li><em>multiple parents hypergraph</em>: extending the above allowing parent atoms to
+have multiple parents. Not sure what the use of this</li></ul><p>I end up thinking really about recursive hypergraph where atoms could
 freely link to other atoms but be part of a more general
-structure. Then comes the idea of <i>recursive fuzzy hypergraph</i> which
+structure. Then comes the idea of <em>recursive fuzzy hypergraph</em> which
 really is the thing. It allows to model how for instance a “word” has
 90% of time the sens of “an atomic semantic token of sentence” and 10%
 of time the sens of “a message”. Given that it can be implemented
@@ -38,7 +34,7 @@ over a sub-graph or using CoSimRank. It seems also that the topology
 open the door to simple ways to compute neighborhood even if it
 requires prior learning
 cf. <a href="http://stackoverflow.com/questions/32851830/is-it-possible-to-achieve-something-similar-to-word2vec-using-a-graphdb">Is it possible to achieve something similar to word2vec</a>.
-I must remember to read about word2vec.</p><p><a href="http://www.datastax.com/dev/blog/tales-from-the-tinkerpop">Marko Rodriguez article on datastax dev blog, Tales from the TinkerPop, is full of graph-theory revelant links</a>.</p><p>I started working on the traversi framework.</p><p>I&apos;ve also been thinking about hyper[graph]{viz}(or). <a class="hashtag" href="/hashtag/mezangelle">#mezangelle</a></p><h4>2015/10/05 - A Series Of Unlikely Explanations</h4><p>In the previous paragraph, I did not talk about my research on the tasks of NLP
+I must remember to read about word2vec.</p><p><a href="http://www.datastax.com/dev/blog/tales-from-the-tinkerpop">Marko Rodriguez article on datastax dev blog, Tales from the TinkerPop, is full of graph-theory revelant links</a>.</p><p>I started working on the traversi framework.</p><p>I&apos;ve also been thinking about hyper[graph]{viz}(or). #mezangelle</p><h4>2015/10/05 - A Series Of Unlikely Explanations</h4><p>In the previous paragraph, I did not talk about my research on the tasks of NLP
 outside the word2vec things. There is different steps and level of
 &quot;understanding&quot; of a sentence in NLP: lexical, syntaxic, semantic. The research
 done as part of <a href="https://en.wikipedia.org/wiki/Combinatory_categorial_grammar">Combinatorial Categorical Grammar</a>
@@ -58,8 +54,8 @@ straithforward. But I&apos;m not there yet.</p><h4>2015/10/11 - Limiting Factor<
 aka. scheme streams of graph vertices and edges. This is quiet a good
 news I have less code to write.</p><p>While working on zindex support I got the brilliant idea to refactor
 some <code>wiredtiger</code> code, that I&apos;ve put in a <code>wiredtigerz</code> module. The
-idea behind this is to <i>make it easier to define table, indices and
-cursors</i> and add a few shortcuts to make the code more readable.</p><p>I discovered <a class="hashtag" href="/hashtag/ai">#ai</a>@freenode.net and met a few interesting people.</p><p>Also, I&apos;m still wondering what will be the main goal. I thinking about
+idea behind this is to <em>make it easier to define table, indices and
+cursors</em> and add a few shortcuts to make the code more readable.</p><p>I discovered #ai@freenode.net and met a few interesting people.</p><p>Also, I&apos;m still wondering what will be the main goal. I thinking about
 Q/A and summarization. Q/A seems more involving. I need to have a look
 at NLP coursera again. Or maybe, I should just code whatever comes to
 my mind and forget about setting any goal...</p><h4>2015/10/14 - Profit Margin</h4><p>I figured that what I am looking for is personnal assistant so it makes sens to
@@ -70,5 +66,8 @@ crawl even small website as fast as I want. Also, most of my search
 evolves around a few website which at least provides an API (or dumps
 (or both)) to speed up the process of crawling. I will start with
 offlining stackoverflow and then go on to do the same job for
-hackernews and wikipedia at least.</p><p>The next step will be to port whoosh/lucene to guile.</p><p>Then I will restart thinking.
-</p></div><p><small>cc-by-nc-sa</small></p></body></html>
+hackernews and wikipedia at least.</p><p>The next step will be to port whoosh/lucene to guile.</p><p>Then I will restart thinking.</p><h4>2016/08/xx - Quietly Confident</h4><ul><li><p>wiredtiger: add collator support</p></li><li><p>wiredtiger: I wanted to add indices to graphitisay that keeps
+lexicographic order. Collator is one solution, the other solution is
+to develop something like bytekey and bytewise. I figured that it is
+not useful for my immediate needs.</p></li><li><p>ipd: add priority queue table, this is meant to be mixed with
+with guile fiber somehow</p></li></ul></div><p><small>cc-by-nc-sa</small></p></body></html>

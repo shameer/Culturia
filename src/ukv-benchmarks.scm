@@ -22,7 +22,7 @@
 
 
 (define-public (ukv-env-open path)
-  "open and init an environment with for ukv"
+  "open and init an environment for ukv"
   (let ((env (env-open path)))
     (env-config-add env *ukv*)
     (env-create env)
