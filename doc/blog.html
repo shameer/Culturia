@@ -66,8 +66,19 @@ crawl even small website as fast as I want. Also, most of my search
 evolves around a few website which at least provides an API (or dumps
 (or both)) to speed up the process of crawling. I will start with
 offlining stackoverflow and then go on to do the same job for
-hackernews and wikipedia at least.</p><p>The next step will be to port whoosh/lucene to guile.</p><p>Then I will restart thinking.</p><h4>2016/08/xx - Quietly Confident</h4><ul><li><p>wiredtiger: add collator support</p></li><li><p>wiredtiger: I wanted to add indices to graphitisay that keeps
+hackernews and wikipedia at least.</p><p>The next step will be to port whoosh/lucene to guile.</p><p>Then I will restart thinking.</p><h4>2016/08/28 - Quietly Confident</h4><ul><li><p>wiredtiger: add minimal collator support</p></li><li><p>wiredtiger: I wanted to add indices to graphitisay that keeps
 lexicographic order. Collator is one solution, the other solution is
-to develop something like bytekey and bytewise. I figured that it is
-not useful for my immediate needs.</p></li><li><p>ipd: add priority queue table, this is meant to be mixed with
-with guile fiber somehow</p></li></ul></div><p><small>cc-by-nc-sa</small></p></body></html>
+to develop something like bytekey and bytewise. But I figured that
+it is not useful for my immediate needs.</p></li><li><p>ipd: add priority queue table, this is meant to be mixed with
+with guile-fibers somehow</p></li><li><p>add <code>wsh</code>: a boolean keyword search engine similar to whoosh.</p></li><li><p>add <code>env</code> and <code>(with-context env body ...)</code> to <code>wiredtigerz</code> which
+is a thread-safe macro allowing to create as many as required
+<code>wiredtigerz</code> context. This should allow to work transparently with
+multiple threads. There is not suppor yet for on-the-fly cursor
+creation (evenif it should be easy to do) because I don&apos;t need it
+yet.</p></li></ul><p>I think I have all the basics building blocks working. Now I need to
+put everything together.</p><p>The plan is to re-implement <code>uav</code> database using <code>env</code> and
+<code>with-context</code>, use that for <code>grf</code> and then re-implement <code>wsh</code> on top
+of <code>grf</code>. This is <strong>not</strong> the most performant solution but it will but
+it will hopefully be the most easy to use. I will experiment with that
+solution and then maybe move (back) things to lower levels when
+required.</p></div><p><small>cc-by-nc-sa</small></p></body></html>

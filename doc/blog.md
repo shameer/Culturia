@@ -148,14 +148,33 @@ The next step will be to port whoosh/lucene to guile.
 
 Then I will restart thinking.
 
-#### 2016/08/xx - Quietly Confident
+#### 2016/08/28 - Quietly Confident
 
-- wiredtiger: add collator support
+- wiredtiger: add minimal collator support
 
 - wiredtiger: I wanted to add indices to graphitisay that keeps
-lexicographic order. Collator is one solution, the other solution is
-to develop something like bytekey and bytewise. I figured that it is
-not useful for my immediate needs.
+  lexicographic order. Collator is one solution, the other solution is
+  to develop something like bytekey and bytewise. But I figured that
+  it is not useful for my immediate needs.
 
 - ipd: add priority queue table, this is meant to be mixed with
-  with guile fiber somehow 
+  with guile-fibers somehow 
+
+- add `wsh`: a boolean keyword search engine similar to whoosh.
+
+- add `env` and `(with-context env body ...)` to `wiredtigerz` which
+  is a thread-safe macro allowing to create as many as required
+  `wiredtigerz` context. This should allow to work transparently with
+  multiple threads. There is not suppor yet for on-the-fly cursor
+  creation (evenif it should be easy to do) because I don't need it
+  yet.
+
+I think I have all the basics building blocks working. Now I need to
+put everything together.
+
+The plan is to re-implement `uav` database using `env` and
+`with-context`, use that for `grf` and then re-implement `wsh` on top
+of `grf`. This is **not** the most performant solution but it will but
+it will hopefully be the most easy to use. I will experiment with that
+solution and then maybe move (back) things to lower levels when
+required.
