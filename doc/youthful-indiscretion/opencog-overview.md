@@ -49,6 +49,67 @@ Notes taking algorithm:
 - Applications
 - Roadmap
 
+<!-- markdown-toc start - Don't edit this section. Run M-x markdown-toc-generate-toc again -->
+**Table of Contents**
+
+- [Introduction](#introduction)
+    - [AI vs AGI](#ai-vs-agi)
+    - [{Open, Cog, Prime}](#open-cog-prime)
+    - [What Kind of Intelligence is OpenCog Aimed At?](#what-kind-of-intelligence-is-opencog-aimed-at)
+    - [What's the secret sauce](#whats-the-secret-sauce)
+    - [Key Claims](#key-claims)
+- [Theory](#theory)
+    - [Pattern based theory of the mind](#pattern-based-theory-of-the-mind)
+        - [What is a pattern?](#what-is-a-pattern)
+        - [What is intelligence?](#what-is-intelligence)
+        - [Which patterns?](#which-patterns)
+        - [How are organized those patterns?](#how-are-organized-those-patterns)
+    - [Mind-World Correspondence Principle](#mind-world-correspondence-principle)
+    - [High-Level Architecture of CogPrime](#high-level-architecture-of-cogprime)
+    - [Local, Global and Glocal](#local-global-and-glocal)
+- [OpenCog framework](#opencog-framework)
+    - [Natural Language Processing Pipeline](#natural-language-processing-pipeline)
+    - [AtomSpace](#atomspace)
+        - [Atoms Types and Weights](#atoms-types-and-weights)
+            - [Atoms](#atoms)
+                - [GetLink, PutLink and BindLink interaction](#getlink-putlink-and-bindlink-interaction)
+        - [Glocal Memory](#glocal-memory)
+        - [Memory Types and Associated Cognitive Processes in CogPrime](#memory-types-and-associated-cognitive-processes-in-cogprime)
+            - [Cognitive Synergy in Probabilistic Logic Network](#cognitive-synergy-in-probabilistic-logic-network)
+        - [Goal-Oriented Dynamics](#goal-oriented-dynamics)
+        - [Clarifying the Key Claims](#clarifying-the-key-claims)
+            - [Mutli-Memory Systems](#mutli-memory-systems)
+            - [Preception, Action and Environment](#preception-action-and-environment)
+            - [Developmental Pathways](#developmental-pathways)
+            - [Knowledge Representation](#knowledge-representation)
+            - [Cognitive Processes](#cognitive-processes)
+                - [Uncertain Logic for Declarative Knowledge](#uncertain-logic-for-declarative-knowledge)
+                - [Program Learning for Procedural Knowledge](#program-learning-for-procedural-knowledge)
+                - [Attention Allocation](#attention-allocation)
+                - [Internal Simulation and Episodic Knowledge](#internal-simulation-and-episodic-knowledge)
+                - [Low-Level Perception and Action](#low-level-perception-and-action)
+                - [Goals](#goals)
+                - [Fulfilling the Cognitive Equation](#fulfilling-the-cognitive-equation)
+                - [Occam's Razor](#occams-razor)
+                - [Cognitive Synergy](#cognitive-synergy)
+                    - [Synergies that Help Inference](#synergies-that-help-inference)
+                    - [Synergies that Help MOSES](#synergies-that-help-moses)
+                - [Synergies that Help Attention Allocation](#synergies-that-help-attention-allocation)
+                - [Further Synergies Related to Pattern Mining](#further-synergies-related-to-pattern-mining)
+                - [Synergies Related to Map Formation](#synergies-related-to-map-formation)
+            - [Emergent Structures and Dynamics](#emergent-structures-and-dynamics)
+- [Applications](#applications)
+    - [Virtual Agents](#virtual-agents)
+    - [Physical Robot](#physical-robot)
+    - [Build Me Something I Haven't Seen Before](#build-me-something-i-havent-seen-before)
+- [Roadmap](#roadmap)
+    - [Measuring Progress toward AGI](#measuring-progress-toward-agi)
+    - [Technical Roadmap](#technical-roadmap)
+- [Glossary](#glossary)
+- [Links](#links)
+
+<!-- markdown-toc end -->
+
 # Introduction
 
 ## AI vs AGI
