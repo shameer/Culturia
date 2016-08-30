@@ -1,4 +1,4 @@
-# Roadmap
+# Ideas
 
 ## Datastore
 
@@ -10,7 +10,7 @@
 
 - improve srfi 41 to match `gremlin` API
 
-- add a graphical interface
+- add a GUI
 
 ## NLP/NLU
 
