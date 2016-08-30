@@ -1,3 +1,5 @@
+(define-module (ukv))
+
 (use-modules (ice-9 match))
 
 (use-modules (srfi srfi-1))
