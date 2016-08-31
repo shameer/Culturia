@@ -301,17 +301,19 @@ with cursor symbols as key and cursors as value"
 (define-public (env-config-add env config)
   (env-configs! env (cons config (env-configs env))))
 
-(define-public (env-open* path configs)
-  (let ((env (env-open path)))
-    (for-each (cut env-config-add env <>) configs)
-    env))
-
 (define-public (env-create env)
   (let* ((connection (env-connection env))
          (session (session-open connection)))
     (apply session-create* (cons session (env-configs env)))
     (session-close session)))
-  
+
+(define-public (env-open* path configs)
+  "open and init an environment for ukv"
+  (let ((env (env-open path)))
+    (for-each (cut env-config-add env <>) configs)
+    (env-create env)
+    env))
+
 (define (get-or-create-context env)
   (with-mutex (env-mutex env)
     (let ((contexts (env-contexts env)))
