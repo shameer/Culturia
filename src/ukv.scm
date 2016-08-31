@@ -17,18 +17,10 @@
 ;;; UKV ukv spec
 ;;;
 
-(define *ukv* '(ukv
-                ((uid . string) (key . string))
-                ((value . string))
-                ((index (key value) (uid)))))
-
-
-(define-public (ukv-env-open path)
-  "open and init an environment for ukv"
-  (let ((env (env-open path)))
-    (env-config-add env *ukv*)
-    (env-create env)
-    env))
+(define-public *ukv* '(ukv
+                       ((uid . string) (key . string))
+                       ((value . string))
+                       ((index (key value) (uid)))))
 
 (define-public (ukv-ref uid key)
   (call-with-cursor 'ukv
@@ -58,42 +50,61 @@
                   assoc)))
     uid))
 
+(define-public (ukv-del! uid)
+  (call-with-cursor 'ukv
+    (lambda (cursor)
+      (for-each (match-lambda
+                  ((key . value)
+                   (cursor-remove* cursor uid (symbol->string key))))
+                (ukv-ref* uid)))))
+
+(define-public (ukv-update! uid assoc)
+  (ukv-del! uid)
+  (call-with-cursor 'ukv
+    (lambda (cursor)
+      (for-each (match-lambda
+                 ((key . value)
+                  (cursor-insert* cursor
+                                  (list uid (symbol->string key))
+                                  (list (scm->string value)))))
+              assoc))))
+
+
+(define-public (ukv-index-ref key value)
+  (call-with-cursor 'ukv-index
+    (lambda (cursor)
+      (map car (cursor-range cursor (symbol->string key) (scm->string value))))))
+
 ;;;
 ;;; tests
 ;;;
 
 (use-modules (test-check))
 
-(define-syntax-rule (timeit body ...)
-  (let ((start (current-time)))
-    (begin body ...)
-    (- (current-time) start)))
-
-
-(define (generate-random-assoc)
-  (map (lambda (_) (cons (string->symbol (generate-uid (lambda (_) #f))) (generate-uid (lambda (_) #f)))) (iota 10)))
-
 (when (or (getenv "CHECK") (getenv "CHECK_UKV"))
   (format #true "* testing ukv\n")
 
   (test-check "open ukv database"
-    (with-env (ukv-env-open "/tmp/wt")
+    (with-env (env-open* "/tmp/wt" (list *ukv*))
       42)
     42)
 
-  (test-check "ukv insert 10000"
-    (with-env (ukv-env-open "/tmp/wt")
-      (timeit 
-       (let ((uids '()))
-         (let loop ((counter 10000))
-           (unless (zero? counter)
-             (let ((uid (ukv-add! (generate-random-assoc))))
-               (set! uids (cons uid uids))
-               (loop (1- counter)))))
-         (for-each ukv-ref* uids))))
-    '())
+  (test-check "ukv-index-ref"
+    (with-env (env-open* "/tmp/wt" (list *ukv*))
+      (ukv-add! '((a . 42) (b . 1337)))
+      (ukv-add! '((a . 0) (c . 1337)))
+      (length (ukv-index-ref 'b 1337)))
+    1)
 
+  (test-check "ukv-del!"
+    (with-env (env-open* "/tmp/wt" (list *ukv*))
+      (ukv-del! (ukv-add! '((a . 42) (b . 1337))))
+      (length (ukv-index-ref 'b 1337)))
+    0)
+
+  (test-check "ukv-update!"
+    (with-env (env-open* "/tmp/wt" (list *ukv*))
+      (ukv-update! (ukv-add! '((a . 42) (b . 1337))) '((a . 42)))
+      (length (ukv-index-ref 'b 1337)))
+    0)
   )
-
-  
-
