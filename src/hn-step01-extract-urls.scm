@@ -1,6 +1,7 @@
 (use-modules (srfi srfi-41))
 (use-modules (srfi srfi-26))
 (use-modules (rnrs io ports))
+(use-modules (ice-9 receive))
 (use-modules (http))
 (use-modules (json))
 
@@ -17,13 +18,15 @@
 ;;; by curl -is over the HN API. cf. https://github.com/HackerNews/API
 ;;;
 
-(define-stream (scm->response-string-stream filename)
+(define (iterator:scm->json filename)
   (let ((file (open filename O_RDONLY)))
-    (stream-let next-entry ((entry (read file)))
-      (if (eof-object? entry)
-          (begin (close file)
-                 stream-null)
-          (stream-cons entry (next-entry (read file)))))))
+    (let loop ()
+      (lambda ()
+        (let ((entry (read file)))
+          (if (eof-object? entry)
+              (begin (close file)
+                     (values '() '()))
+              (values entry (loop))))))))
 
 (define (maybe-json string)
   (catch #true
@@ -52,10 +55,14 @@
     (close port)))
             
 (define (extract-urls input output)
-  ((compose (cut stream-for-each (append-to output) <>)
-            (cut stream-map (cut assoc-ref <> "url") <>)
-            (cut stream-filter story? <>)
-            (cut stream-map response-string->json <>))
-   (scm->response-string-stream input)))
-
+  (let ((generator (iterator:scm->json input))
+        (append (append-to output)))
+    (let loop ()
+      (receive (entry next) (generator)
+        (unless (null? entry)
+          (let ((json (response-string->json entry)))
+            (when (story? json)
+              (append (assoc-ref json "url")))
+            (loop)))))))
+  
 (extract-urls "/home/amirouche/data/hn/hn.scm" "/home/amirouche/data/hn/hn.urls.txt")
