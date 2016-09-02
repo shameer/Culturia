@@ -554,7 +554,7 @@ if KEY is not found"
 ;;; generate-uid
 ;;;
 
-(define (random-id size)
+(define (random-string size)
   "Generate and random identifier of length SIZE"
   (define CHARS "0123456789AZERTYUIOPQSDFGHJKLMWXCVBN")
   ;; append SIZE alphanumeric chars from `CHARS`
@@ -570,7 +570,7 @@ if KEY is not found"
    according to `exists?`"
   (let loop ()
     ;; generate a random identifier until it find an one that doesn't already `exists?`
-    (let ((id (random-id size)))
+    (let ((id (random-string size)))
       (if (exists? id) (loop) id))))
 
 ;;;
