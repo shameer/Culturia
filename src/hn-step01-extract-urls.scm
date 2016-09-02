@@ -18,7 +18,7 @@
 ;;; by curl -is over the HN API. cf. https://github.com/HackerNews/API
 ;;;
 
-(define (iterator:scm->json filename)
+(define (iterator:file->scm filename)
   (let ((file (open filename O_RDONLY)))
     (let loop ()
       (lambda ()
@@ -55,7 +55,7 @@
     (close port)))
             
 (define (extract-urls input output)
-  (let ((generator (iterator:scm->json input))
+  (let ((generator (iterator:file->scm input))
         (append (append-to output)))
     (let loop ()
       (receive (entry next) (generator)
