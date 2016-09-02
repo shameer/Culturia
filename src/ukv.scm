@@ -39,7 +39,7 @@
 (define (make-uid)
   (generate-uid (lambda (id) (not (null? (ukv-ref* id))))))
 
-(define (ukv-add! assoc)
+(define-public (ukv-add! assoc)
   (let ((uid (make-uid)))
     (call-with-cursor 'ukv
       (lambda (cursor)
