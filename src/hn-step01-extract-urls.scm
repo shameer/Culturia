@@ -1,12 +1,8 @@
-(use-modules (srfi srfi-1))
 (use-modules (srfi srfi-41))
 (use-modules (srfi srfi-26))
 (use-modules (rnrs io ports))
-(use-modules (ice-9 receive))
-(use-modules (ice-9 threads))
 (use-modules (http))
 (use-modules (json))
-(use-modules (msgpack))
 
 
 ;; (setlocale LC_ALL "")
@@ -17,7 +13,7 @@
 ;;;
 ;;; The dump must be generated with hn-step-00-dump-hn-api.scm
 ;;;
-;;; The dump must be a msgpack stream of response string as provided
+;;; The dump must be a scm stream of response string as provided
 ;;; by curl -is over the HN API. cf. https://github.com/HackerNews/API
 ;;;
 
@@ -29,12 +25,9 @@
                  stream-null)
           (stream-cons entry (next-entry (read file)))))))
 
-(define (assocify ht)
-  (hash-map->list cons ht))
-
 (define (maybe-json string)
   (catch #true
-    (lambda () (assocify (json-string->scm string)))
+    (lambda () (call-with-input-string string read-json))
     (lambda _ (display "j") '())))
 
 (define (maybe-body string)
