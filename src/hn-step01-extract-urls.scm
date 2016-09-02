@@ -27,14 +27,13 @@
       (if (eof-object? entry)
           (begin (close file)
                  stream-null)
-          (begin (display ".")
-                 (stream-cons entry (next-entry (read file))))))))
+          (stream-cons entry (next-entry (read file)))))))
 
 (define (assocify ht)
   (hash-map->list cons ht))
 
 (define (maybe-json string)
-  (catch 'json-invalid
+  (catch #true
     (lambda () (assocify (json-string->scm string)))
     (lambda _ (display "j") '())))
 
@@ -53,13 +52,12 @@
        (< 3 (assoc-ref item "score"))))
 
 (define* ((append-to filename) url)
-  (display "O")
+  (display ".")
   (let ((port (open-file filename "a")))
     (put-string port url)
     (put-char port #\newline)
     (close port)))
-
-
+            
 (define (extract-urls input output)
   ((compose (cut stream-for-each (append-to output) <>)
             (cut stream-map (cut assoc-ref <> "url") <>)

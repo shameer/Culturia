@@ -1,41 +1,47 @@
 ## Guile Wiredtiger
 
-Wiredtiger is a ordered key/value store written in C licensed gplv2 or gplv3.
-It's some what the successor of Oracle Berkeley Database (bsddb). It's similar
-in principles to leveldb but faster. It allows to build your own database
-easily.
+Wiredtiger is a ordered key/value store written in C licensed gplv2 or
+gplv3.  It's some what the successor of Oracle Berkeley Database
+(bsddb). It's similar in principles to leveldb but faster. It allows
+to build your own database easily.
 
-It's a ACID, NoSQL, networkless, with automatic indices, multithread support.
+It's a ACID, NoSQL, networkless, with multilpe columns table and
+automatic indices, it has multithread support.
 
-Here follow the documentation of that module which follows closely wiredtiger
-API. It's highly recommended to get started to have a look at
-[wiredtiger's schema](http://source.wiredtiger.com/2.6.1/schema.html)
+Here follow the documentation of that module which follows closely
+wiredtiger API. It's highly recommended to get started to have a look
+at
+[wiredtiger's schema](http://source.wiredtiger.com/develop/schema.html)
 documentation.
 
 ### Reference API
 
-A lot of the API is available, what remains can be the subject of patches :)
+A lot of the API is available, what remains can be the subject of
+patches :)
 
-The following documentation doesn't cover all of wiredtiger, it is best to have
-a look at [wiredtiger manual](http://source.wiredtiger.com/2.6.1/index.html)
+The following documentation doesn't cover all of wiredtiger, it is
+best to have a look at
+[wiredtiger manual](http://source.wiredtiger.com/develop/index.html)
 too.
 
 They are three objects in guile-wiredtiger:
 
-- `<connection>` a repsent a particular connection to the wiredtiger engine.
-ACID is not supported across several instance of  `<connection>`.
+- `<connection>` a represent a particular connection to the wiredtiger
+  engine.  ACID is not supported across several instance of
+  `<connection>`.
 
 - `<session>` has a `<connection>` as parent. It's not threadsafe.
 
-- `<cursor>` has a `<session>` as parent.
+- `<cursor>` has a `<session>` as parent. It's not threadsafe.
 
 #### <connection>
 
 ##### (connection-open home config) -> connection
 
-Open a connection to a database. Most applications will open a single connection
-to a database. A connection can be shared among several threads. There is no
-support ACID transactions between several connections.
+Open a connection to a database. Most applications will open a single
+connection to a database. A connection can be shared among several
+threads. There is no support for ACID transactions between several
+connections.
 
 Example:
 
