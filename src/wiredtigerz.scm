@@ -558,11 +558,12 @@ if KEY is not found"
   "Generate and random identifier of length SIZE"
   (define CHARS "0123456789AZERTYUIOPQSDFGHJKLMWXCVBN")
   ;; append SIZE alphanumeric chars from `CHARS`
-  (let loop ((count size)
-             (id ""))
-    (if (eq? count 0)
-        id
-        (loop (1- count) (format #f "~a~a" id (string-ref CHARS (random 36)))))))
+  (list->string
+   (let loop ((count size)
+              (chars '()))
+     (if (eq? count 0)
+         chars
+         (loop (1- count) (cons (string-ref CHARS (random 36)) chars))))))
 
 (define*-public (generate-uid exists? #:optional (size 8))
   "Generate a random string made up alphanumeric ascii chars that doesn't exists
