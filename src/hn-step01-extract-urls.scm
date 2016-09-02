@@ -67,4 +67,4 @@
             (cut stream-map response-string->json <>))
    (scm->response-string-stream input)))
 
-(extract-urls "/home/amirouche/data/hn.scm" "/home/amirouche/data/hn.urls.txt")
+(extract-urls "/home/amirouche/data/hn/hn.scm" "/home/amirouche/data/hn/hn.urls.txt")
