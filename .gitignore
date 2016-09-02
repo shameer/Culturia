@@ -4,4 +4,5 @@ db
 data
 src/stackoverflow
 src/conceptnet
-src/hntmp
+src/hn
+tmp
