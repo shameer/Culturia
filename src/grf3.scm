@@ -7,6 +7,7 @@
 ;; (use-modules (ice-9 optargs))  ;; define*
 (use-modules (ice-9 match))
 
+(use-modules (plain))
 (use-modules (wiredtiger))
 (use-modules (wiredtigerz))
 (use-modules (ukv))
