@@ -37,7 +37,7 @@ a {
 pre, code {
     font-family: mono;
     color: black;
-    font-size: 14px;
+    font-size: 17px;
 }
 
 pre {
@@ -46,6 +46,11 @@ pre {
     border: 1px solid hsl(41, 28%, 31%);
     border-radius: 3px;
 }
+
+strong, b {
+    font-size: 19px;
+}
+
 
 p small {
     margin: 15px;
