@@ -31,7 +31,7 @@
   (match-lambda (((uid key) . (value))
                  (cons (string->symbol key) (string->scm value)))))
 
-(define (ukv-ref* uid)
+(define-public (ukv-ref* uid)
   (call-with-cursor 'ukv
     (lambda (cursor)
       (map assocify (cursor-range-prefix cursor uid "")))))
