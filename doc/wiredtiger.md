@@ -14,6 +14,17 @@ at
 [wiredtiger's schema](http://source.wiredtiger.com/develop/schema.html)
 documentation.
 
+### Getting started
+
+```bash
+$ git clone https://github.com/wiredtiger/wiredtiger --branch develop --depth 1
+$ cd wiredtiger 
+$ ./autogen.sh && ./configure && make && make install
+```
+
+The latest source of guile-wiredtiger can be found 
+in [culturia repository](https://github.com/amirouche/Culturia).
+
 ### Reference API
 
 A lot of the API is available, what remains can be the subject of

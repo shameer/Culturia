@@ -1,12 +1,14 @@
 ## wiredtigerz
 
-`wiredtigerz` gather extra procedures to work with `guile wiredtiger` which aims
-at making the main workflow more obvious.
+`wiredtigerz` gather extra procedures to work with
+[wiredtiger](wiredtiger.html) which aims at making the main workflow
+more obvious.
 
 It implements a declarative API to create tables with their indices and open
 cursor on them. It provides a few helpers for common patterns.
 
-`wiredtigerz` module can be found in [culturia repository](https://github.com/amirouche/Culturia/blob/master/culturia/wiredtigerz.scm).
+`wiredtigerz` module can be found in
+[culturia repository](https://github.com/amirouche/Culturia/blob/master/culturia/wiredtigerz.scm).
 
 ### Reference API
 
