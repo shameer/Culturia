@@ -1,12 +1,6 @@
 ;; Copyright © 2016 Amirouche BOUBEKKI <amirouche@hypermove.net>
 (define-module (grf3))
 
-(use-modules (srfi srfi-1))  ;; lists
-(use-modules (srfi srfi-41))  ;; streams
-
-;; (use-modules (ice-9 optargs))  ;; define*
-(use-modules (ice-9 match))
-
 (use-modules (plain))
 (use-modules (wiredtiger))
 (use-modules (wiredtigerz))
