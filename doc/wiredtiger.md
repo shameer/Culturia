@@ -27,7 +27,7 @@ too.
 They are three objects in guile-wiredtiger:
 
 - `<connection>` a represent a particular connection to the wiredtiger
-  engine.  ACID is not supported across several instance of
+  engine. ACID is not supported across several instance of
   `<connection>`.
 
 - `<session>` has a `<connection>` as parent. It's not threadsafe.
@@ -40,51 +40,105 @@ They are three objects in guile-wiredtiger:
 
 Open a connection to a database. Most applications will open a single
 connection to a database. A connection can be shared among several
-threads. There is no support for ACID transactions between several
+threads. There is no support for ACID transactions between several
 connections.
+
+`HOME` must be the path to the database home directory, the pointed
+directory must exist or wiredtiger will throw a `wiredtiger`
+exception.
+
+See
+[official documentation](http://source.wiredtiger.com/develop/group__wt.html#ga9e6adae3fc6964ef837a62795c7840ed)
+to know which options can be passed in `CONFIG`.
 
 Example:
 
+```scheme
+(connection-open "/tmp/" "create,cache_size=500M")
 ```
-(connection-open "./databases/magic-numbers" "create,cache_size=500M")
-```
-
-`home` the path to the database home directory. The path must exists.
 
 ##### (connection-close connection [config]) -> boolean
 
-Close connection. Any open sessions will be closed. config optional argument,
-that can be `leak_memory` to not free memory during close.
+Close connection. Any open sessions or cursors will be
+closed. `CONFIG` optional argument can be `leak_memory` to not free
+memory during close.
+
+##### (connection-add-collator connection name format proc)
+
+**This is unstable and will hopefully be subject to changes**
+
+Add `PROC` as a custom collation function named `NAME` against
+`CONNECTION`. It can be later referenced in `session-create`
+configuration using `NAME`.
+
+Basically a collator procedure allows to customize the function used
+to order records in a table. It's useful in situations where default
+lexicographic ordering is not what you want. You should expect a slow
+down during insert. For instance, a quick solution to pack bignums is
+to use `write` and use a string column to store it but this will lead
+to a not properly ordered table since `(string<? "10" "2") -> #true`,
+instead using a custom collation you can use a Guile number comparison
+function to provide the correct ordering.
+
+The interface is a bit different from wiredtiger. (FIXME: explain why)
+
+`FORMAT` must a be a wiredtiger format string it will be used to
+unpack keys before passing them to `PROC`.
+
+`PROC` must be a comparison procedure with the following signature:
+
+```scheme
+(proc key other) -> number
+```
+
+`PROC` must return to `-1` if `key < other`, `0` if `key == other`,
+`1` if `key > other`.
+
+It's recommended to read
+[documentation about custom collators](http://source.wiredtiger.com/develop/custom_collators.html).
+
 
 #### <session>
 
+All data operations are performed in the context of a session. This
+encapsulates the thread and transactional context of the operation.
+
+Thread safety: A session is not usually shared between threads, see
+[Multithreading](http://source.wiredtiger.com/develop/threads.html)
+for more information. You can create a session in a thread and pass it
+to another, but you can't concurrently use the session from different
+threads.
+
 ##### (session-open connection [config]) -> <session>
 
-Open a session.
+Open a session against `CONNECTION`. You will most likely want to call
+this procedure.
+
+`CONFIG` can be used to provide the isolation level for the whole
+session:
+
+- `read-uncommited` transactions can see changes made by other
+  transactions before those transactions are committed. Dirty reads,
+  non-repeatable reads and phantoms are possible. (default value)
+
+- `read-commited` transactions cannot see changes made by other
+  transactions before those transactions are committed. Dirty reads
+  are not possible; non-repeatable reads and phantoms are
+  possible. Committed changes from concurrent transactions become
+  visible when no cursor is positioned in the read-committed
+  transaction.
+
+- `snapshot` transactions read the versions of records committed
+  before the transaction started. Dirty reads and non-repeatable reads
+  are not possible; phantoms are possible.
+
+If you don't know what you are doing, use `snapshot`.
 
 Example:
 
-```
+```scheme
 (session-open connection "isolation=snapshot")
 ```
-
-`config` configures isolation level:
-
-- `read-uncommited` transactions can see changes made by other transactions
-  before those transactions are committed. Dirty reads, non-repeatable reads
-  and phantoms are possible.
-
-- `read-commited` transactions cannot see changes made by other transactions
-  before those transactions are committed. Dirty reads are not possible;
-  non-repeatable reads and phantoms are possible. Committed changes from
-  concurrent transactions become visible when no cursor is positioned in the
-  read-committed transaction.
-
-- `snapshot` transactions read the versions of records committed before the
-  transaction started. Dirty reads and non-repeatable reads are not possible;
-  phantoms are possible.
-
-If you don't know what you are doing, use `snapshot`.
 
 ##### (session-close session)
 
@@ -92,45 +146,50 @@ Close the session handle. This will release the resources associated with the
 session handle, including rolling back any active transactions and closing any
 cursors that remain open in the session.
 
-All data operations are performed in the context of a session. This encapsulates
-the thread and transactional context of the operation.
-
-Thread safety: A session is not usually shared between threads, see
-Multithreading for more information.
-
 ##### (session-create session name config)
 
 Create a table, column group, index or file.
 
+`NAME` the URI of the object to create, such as `"table:stock"`. For a
+description of URI formats see [Data Sources](http://source.wiredtiger.com/develop/data_sources.html).
+
+`CONFIG` configures the object,
+cf. [official documentation](http://source.wiredtiger.com/develop/struct_w_t___s_e_s_s_i_o_n.html#a358ca4141d59c345f401c58501276bbb)
+for details.
+
+In guile-wiredtiger, not all formats are supported. Patch welcome!
+
 Example:
 
 ```
-(session-create session "table:magic-numbers" "key_format=i,value_format=S")
+(session-create session "table:magic-numbers" "key_format=Q,value_format=S")
 ```
-
-`name` the URI of the object to create, such as `"table:stock"`. For a
-description of URI formats see **Data Sources**.
-
-`config` configures the object.
-
-In guile-wiredtiger, `key_format` and `key_value` only support integral types
-`bBhHiIlLqQr` and variable length strings `S`. See format types for more
-information.
 
 ##### (session-transaction-begin session [config])
 
-Start a transaction.
+Start a transaction. A transaction remains active until ended with
+`session-transaction-commit` or
+`session-transaction-rollback`. Operations performed on cursors
+capable of supporting transactional operations that are already open
+in this session, or which are opened before the transaction ends, will
+operate in the context of the transaction.
+
+`session-transaction-begin` will throw a `wiredtiger` exception if a
+transaction is already in progress in the session.
+
+`CONFIG` can take several arguments
+cf. [official documentation](http://source.wiredtiger.com/develop/struct_w_t___s_e_s_s_i_o_n.html#a7e26b16b26b5870498752322fad790bf).
 
 ##### (session-transaction-commit session [config])
 
-Commit the current transaction. A transaction must be in progress when this
-method is called. If sesssion-commit-transaction returns #f, the transaction
-was rolled back, not committed.
+Commit the current transaction. A transaction must be in progress when
+this method is called. Throw a `wiredtiger` exception if the
+transaction was rolledback.
 
 ##### (session-transaction-rollback session [config])
 
-Roll back the current transaction. A transaction must be in progress when this
-method is called. All cursors are reset.
+Rollback the current transaction. A transaction must be in progress when this
+methods called. All cursors are reset.
 
 #### <cursor>
 
@@ -140,22 +199,26 @@ Open a new cursor on a data source or duplicate an existing cursor.
 
 Cursor handles should be discarded by calling `cursor-close`.
 
-Cursors capable of supporting transactional operations operate in the context
-of the current transaction, if any.
+Cursors capable of supporting transactional operations operate in the
+context of the current transaction, if any.
 
 `session-transaction-rollback` implicitly resets all cursors.
 
 Cursors are relatively light-weight objects but may hold references to
-heavier-weight objects; applications should re-use cursors when possible,
-but instantiating new cursors is not so expensive that applications need
-to cache cursors at all cost.
+heavier-weight objects; applications should re-use cursors when
+possible, but instantiating new cursors is not so expensive that
+applications need to cache cursors at all cost.
 
-`uri` is the data source on which the cursor operates; cursors are usually
-opened on tables, however, cursors can be opened on any data source,
-regardless of whether it is ultimately stored in a table. Some cursor
-types may have limited functionality (for example, they may be read-only
-or not support transactional updates). See **Data Sources** for more
-information.
+`URI` is the data source on which the cursor operates; cursors are
+usually opened on tables, however, cursors can be opened on any data
+source, regardless of whether it is ultimately stored in a table. Some
+cursor types may have limited functionality (for example, they may be
+read-only or not support transactional updates). See
+[Data Sources](http://source.wiredtiger.com/develop/data_sources.html)
+for more information.
+
+`CONFIG` can take several arguments, cf. 
+[official documentation](http://source.wiredtiger.com/develop/struct_w_t___s_e_s_s_i_o_n.html#afb5b4a69c2c5cafe411b2b04fdc1c75d)
 
 ##### (cursor-key-set cursor . key)
 
@@ -163,43 +226,42 @@ Set the key for the next operation. If an error occurs during this operation,
 a flag will be set in the cursor, and the next operation to access the value
 will fail. This simplifies error handling in applications.
 
-`key` must consistent with the format of the current object key.
+`KEY` must consistent with the format of the current object key.
 
-##### (cursor-value-set cursor key)
+##### (cursor-value-set cursor value)
 
-Set the key for the next operation. If an error occurs during this operation,
-a flag will be set in the cursor, and the next operation to access the key will
+Set the value for the next operation. If an error occurs during this operation,
+a flag will be set in the cursor, and the next operation to access the value will
 fail. This simplifies error handling in applications.
 
-`key` must consistent with the format of the current object value.
+`VALUE` must consistent with the format of the current object value.
 
 ##### (cursor-key-ref cursor) -> list
 
-
-Get the key for the current record. The returned value is a bytevector that can
-be unpacked using the correct key format string of the associated object.
+Get the key for the current record.
 
 ##### (cursor-value-ref cursor) -> list
 
-Get the value for the current record. The returned value is a bytevector that
-can be unpacked using the correct key format string of the associated object.
+Get the value for the current record.
 
-##### (cursor-next cursor) -> boolean
+##### (cursor-next cursor)
 
-Move the cursor to the next record. Returns #f if there is no more records.
+Move the cursor to the next record. Throw a `wiredtiger` exception if
+there none.
 
-##### (cursor-previous cursor) -> boolean
+##### (cursor-previous cursor)
 
-Move the cursor to the previous record. Returns #f if there is no more records.
+Move the cursor to the previous record. Throw a `wiredtiger` exception if
+there none.
 
-##### (cursor-reset cursor) -> boolean
+##### (cursor-reset cursor)
 
 Reset the position of the cursor. Any resources held by the cursor are released,
 and the cursor's key and position are no longer valid. A subsequent iteration
 with `cursor-next` will move to the first record, or with `cursor-prev` will
 move to the last record.
 
-##### (cursor-search cursor) -> boolean
+##### (cursor-search cursor)
 
 On sucess move the cursor to the record matching the key. The key must first
 be set.
@@ -207,7 +269,7 @@ be set.
 To minimize cursor resources, the `cursor-reset` method should be called as soon
 as the record has been retrieved and the cursor no longer needs that position.
 
-##### (cursor-search-near cursor) -> -1, 0, 1 or #f
+##### (cursor-search-near cursor) -> -1, 0, 1
 
 Return the record matching the key if it exists, or an adjacent record.
 An adjacent record is either the smallest record larger than the key or the
@@ -218,7 +280,7 @@ On success, the cursor ends positioned at the returned record; to minimize
 cursor resources, the cursor-reset method should be called as soon as the record
 has been retrieved and the cursor no longer needs that position.
 
-##### (cursor-insert cursor) -> boolean
+##### (cursor-insert cursor)
 
 Insert a record and optionally update an existing record.
 
@@ -248,7 +310,7 @@ The maximum length of a single column stored in a table is not fixed (as it
 partially depends on the underlying file configuration), but is always a small
 number of bytes less than 4GB.
 
-##### (cursor-update cursor) -> boolean
+##### (cursor-update cursor)
 
 Update a record and optionally insert an existing record.
 
@@ -267,7 +329,7 @@ The maximum length of a single column stored in a table is not fixed (as it
 partially depends on the underlying file configuration), but is always a small
 number of bytes less than 4GB.
 
-##### (cursor-remove cursor) -> boolean
+##### (cursor-remove cursor)
 
 Remove a record. The key must be set.
 

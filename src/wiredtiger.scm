@@ -149,6 +149,10 @@
 
 
 (define*-public (connection-close connection #:optional (config ""))
+  "Close CONNECTION. Any open sessions or cursors will be closed. CONFIG
+   must be a string. It accept a single option `leak_memory` a boolean flag
+   which default value is `false`. If `leak_memory` is set to `true` memory
+   will not be freed during close"
   (let ((function (pointer->procedure* int (*connection-close connection) POINTER POINTER)))
     (let* (;; init a double pointer
            (pointer (u64vector 0))
@@ -168,7 +172,9 @@
                         0))))
 
 (define-public (connection-add-collator connection name format proc)
-  "add PROC as a collator named NAME against CONNECTION"
+  "Aedd PROC as a collator named NAME against CONNECTION. PROC must be
+   compare its two arguments and return `-1` if `key < other`, `0` if
+   `key == other`, `1` if `key > other`."
   (let* ((function (pointer->procedure* int (*connection-add-collator connection) '* '* '* '*))
                  (collator (pointer-address (procedure->pointer int (make-collator format proc) (list '* '* '* '* '*))))
                  (collator (bytevector->pointer (u64vector collator 0 0))))
@@ -226,6 +232,9 @@ NULL))))
     (throw 'wiredtiger (session-string-error* session code))))
 
 (define*-public (session-open connection #:optional (config ""))
+  "Open a session against CONNECTION. CONFIG accepts `isolation` as
+   only options. It can be `read-uncommited`, `read-commited` or
+   `snapshot`."
   (let ((function (pointer->procedure* int (*connection-open-session connection) POINTER POINTER POINTER POINTER)))
     (let* (;; init a double pointer
            (pointer (u64vector 0))
@@ -239,6 +248,9 @@ NULL))))
       (make make-*session pointer 26))))
 
 (define-public (session-create session name config)
+  "Create a table, column group, index or file.
+
+   cf. http://source.wiredtiger.com/develop/struct_w_t___s_e_s_s_i_o_n.html#a358ca4141d59c345f401c58501276bbb"
   (let ((function (pointer->procedure* int (*session-create session) POINTER POINTER POINTER)))
     (let* (;; convert arguments to c types
            (name (string->pointer name))
@@ -248,18 +260,27 @@ NULL))))
       (session-check session code))))
 
 (define-public (session-close session)
+  "Close the session handle. This will release the resources
+   associated with the session handle, including rolling back any active
+   transactions and closing any cursors that remain open in the session."
   (let ((function (pointer->procedure* int (*session-close session) POINTER)))
     (session-check session (function (*session-pointer session)))))
 
 (define*-public (session-transaction-begin session #:optional (config ""))
+  "Start a transaction. A transaction remains active until ended."
   (let ((function (pointer->procedure* int (*session-transaction-begin session) POINTER POINTER)))
     (session-check session (function (*session-pointer session) (string->pointer config)))))
 
 (define*-public (session-transaction-commit session #:optional (config ""))
+  "Commit the current transaction. A transaction must be in progress when this method is called.
+
+   If the transaction was rolledback, it will throw a `wiredtiger` exception"
   (let ((function (pointer->procedure* int (*session-transaction-commit session) POINTER POINTER)))
     (session-check session (function (*session-pointer session) (string->pointer config)))))
 
 (define*-public (session-transaction-rollback session #:optional (config ""))
+  "Rollback the current transaction. A transaction must be in progress
+   when this methods called. All cursors are reset."
   (let ((function (pointer->procedure* int (*session-transaction-rollback session) POINTER POINTER)))
     (session-check session (function (*session-pointer session) (string->pointer config)))))
 
@@ -316,6 +337,9 @@ NULL))))
   (pointer->string (*cursor-value-format cursor)))
 
 (define*-public (cursor-open session uri #:optional (config ""))
+  "Open a new cursor on a data source.
+
+   cf. http://source.wiredtiger.com/develop/struct_w_t___s_e_s_s_i_o_n.html#afb5b4a69c2c5cafe411b2b04fdc1c75d"
   (let ((function (pointer->procedure* int (*session-cursor-open session) POINTER POINTER POINTER POINTER POINTER)))
     (let* (;; init a double pointer
            (pointer (u64vector 0))
@@ -369,6 +393,7 @@ NULL))))
                  (append out (list ((assoc-ref *item->value* (car formats)) (car pointers)))))))))
 
 (define-public (cursor-key-ref cursor)
+  "Retrieve the current key"
   (let* ((args (map (lambda _ (u64vector 0 0)) (string->list (cursor-key-format cursor))))
          (args* (cons (*cursor-pointer cursor) (map bytevector->pointer args)))
          (signature (map (lambda _ POINTER) args*))
@@ -377,6 +402,7 @@ NULL))))
     (pointers->scm (cursor-key-format cursor) args)))
 
 (define-public (cursor-value-ref cursor)
+  "Retrieve the current value"
   (let* ((args (map (lambda _ (u64vector 0 0)) (string->list (cursor-value-format cursor))))
          (args* (cons (*cursor-pointer cursor) (map bytevector->pointer args)))
          (signature (map (lambda _ POINTER) args*))
@@ -417,18 +443,33 @@ NULL))))
                  (append out (list ((assoc-ref *format->pointer* (car formats)) (car values)))))))))
 
 (define-public (cursor-key-set cursor . key)
+  "Set the key for the next operation. If an error occurs during this operation,
+   a flag will be set in the cursor, and the next operation to access the value
+   will fail. This simplifies error handling in applications.
+
+   KEY must consistent with the format of the current object key."
   (let* ((args (cons (*cursor-pointer cursor) (formats->items (cursor-key-format cursor) key)))
          (signature (map (lambda ignore POINTER) args))
          (function (pointer->procedure int (*cursor-key-set cursor) signature)))
     (apply function args)))
 
 (define-public (cursor-value-set cursor . value)
+  "Set the value for the next operation. If an error occurs during this operation,
+   a flag will be set in the cursor, and the next operation to access the
+   value will fail. This simplifies error handling in applications.
+
+   VALUE must consistent with the format of the current object value."
+
   (let* ((args (cons (*cursor-pointer cursor) (formats->items (cursor-value-format cursor) value)))
          (signature (map (lambda ignore POINTER) args))
          (function (pointer->procedure int (*cursor-value-set cursor) signature)))
     (apply function args)))
 
 (define-public (cursor-reset cursor)
+  "Reset the position of the cursor. Any resources held by the cursor are released,
+   and the cursor's key and position are no longer valid. A subsequent
+   iteration with `cursor-next` will move to the first record, or with
+   `cursor-prev` will move to the last record."
   (let ((function (pointer->procedure* int (*cursor-reset cursor) POINTER)))
     (session-check (*cursor-session cursor) (function (*cursor-pointer cursor)))))
 
@@ -441,10 +482,24 @@ NULL))))
     (session-check (*cursor-session cursor) (function (*cursor-pointer cursor)))))
 
 (define-public (cursor-search cursor)
+  "On sucess move the cursor to the record matching the key. The key
+   must first be set.
+
+   To minimize cursor resources, the `cursor-reset` method should be
+   called as soon as the record has been retrieved and the cursor no
+   longer needs that position."
   (let ((function (pointer->procedure* int (*cursor-search cursor) POINTER)))
     (session-check (*cursor-session cursor) (function (*cursor-pointer cursor)))))
 
 (define-public (cursor-search-near cursor)
+  "Return the record matching the key if it exists, or an adjacent record.
+   An adjacent record is either the smallest record larger than the key
+   or the largest record smaller than the key (in other words, a
+   logically adjacent key).  The key must first be set.
+
+   On success, the cursor ends positioned at the returned record; to minimize
+   cursor resources, the cursor-reset method should be called as soon as the record
+   has been retrieved and the cursor no longer needs that position."
   (let ((function (pointer->procedure* int (*cursor-search-near cursor) POINTER POINTER)))
     (let* ((integer (s32vector 0))
            (pointer (bytevector->pointer integer)))
@@ -452,18 +507,24 @@ NULL))))
       (s32vector-ref integer 0))))
 
 (define-public (cursor-insert cursor)
+  "Insert a record and optionally update an existing record."
   (let ((function (pointer->procedure* int (*cursor-insert cursor) POINTER)))
     (session-check (*cursor-session cursor) (function (*cursor-pointer cursor)))))
 
 (define-public (cursor-update cursor)
+  "Update a record and optionally insert an existing record."
   (let ((function (pointer->procedure* int (*cursor-update cursor) POINTER)))
     (session-check (*cursor-session cursor) (function (*cursor-pointer cursor)))))
 
 (define-public (cursor-remove cursor)
+  "Remove a record. The key must be set."
   (let ((function (pointer->procedure* int (*cursor-remove cursor) POINTER)))
     (session-check (*cursor-session cursor) (function (*cursor-pointer cursor)))))
 
 (define-public (cursor-close cursor)
+  "Close the cursor. This releases the resources associated with the cursor handle.
+   Cursors are closed implicitly by ending the enclosing connection or
+   closing the session in which they were opened."
   (let ((function (pointer->procedure* int (*cursor-close cursor) POINTER)))
     (session-check (*cursor-session cursor) (function (*cursor-pointer cursor)))))
 
