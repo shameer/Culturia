@@ -17,7 +17,7 @@
        (iota 10)))
 
 (define alpha 10000)
-(define beta 10)
+(define beta 1000)
 
 (define (choices lst)
   (let ((size (length lst)))
