@@ -2,33 +2,30 @@
 <a href="wiredtiger.html">wiredtiger</a> which aims at making the main workflow
 more obvious.</p><p>It implements a declarative API to create tables with their indices and open
 cursor on them. It provides a few helpers for common patterns.</p><p><code>wiredtigerz</code> module can be found in
-<a href="https://github.com/amirouche/Culturia/blob/master/culturia/wiredtigerz.scm">culturia repository</a>.</p><h3>Reference API</h3><h4>(session-create* session . configs)</h4><p><code>session-create*</code> will create the tables and indices defined declarativly in
-<code>configs</code>. a <code>config</code> must looks like the following:</p><pre><code>(table-name
+<a href="https://github.com/amirouche/Culturia/blob/master/culturia/wiredtigerz.scm">culturia repository</a>.</p><h3>Table schema</h3><p>A table a schema is the specification for a given wiredtiger table.</p><p>It can be described as follow:</p><pre><code class="language-scheme">(table-name
  (key assoc as (column-name . column-type))
  (value assoc as (column-name . column-type))
- ((list indices as (indexed-ame (indexed keys) (projections column names)))))</code></pre><p><code>column-type</code> are verbose names for column types:</p><ul><li><p><code>record</code></p></li><li><p><code>string</code></p></li><li><p><code>unsigned-integer</code></p></li><li><p><code>integer</code></p></li><li><p><code>raw</code></p></li></ul><p>An example of a configuration that defines an <code>posts</code> table with <code>uid</code>, <code>title</code>,
-<code>body</code>, <code>published-at</code> fields and one index one <code>published-at</code> with a project
+ ((list indices as (indexed-ame (indexed keys) (projections column names)))))</code></pre><p><code>column-type</code> are verbose names for column types:</p><ul><li><p><code>record</code></p></li><li><p><code>string</code></p></li><li><p><code>unsigned-integer</code> or <code>positive-integer</code></p></li><li><p><code>integer</code></p></li><li><p><code>raw</code></p></li></ul><p>An example of a configuration that defines an <code>posts</code> table with <code>uid</code>, <code>title</code>,
+<code>body</code>, <code>published-at</code> fields and one index one <code>published-at</code> with a projectionñ
 on <code>uid</code> column:</p><pre><code>(define posts &apos;(posts
  ((uid . raw))
  ((title . string) (body . string) (published-at . raw))
- ((published-at (published-at) (uid)))))</code></pre><p>You can create the table and indices in one call using the following code:</p><pre><code>(define connection (connection-open &quot;/tmp/wiredtigerz&quot; &quot;create&quot;))
-(define session (session-open connection))
-(session-create* session posts)
-(session-close session)</code></pre><h4>(cursor-open* session . configs)</h4><p><code>(cursor-open* session config)</code> will open all the cursors related to a given
-<code>config</code> as an assoc.</p><p>You can open cursors over the table and indices you created using
-<code>session-open*</code>. It use the same syntax and the same table declaration.</p><pre><code>(define connection (connection-open &quot;/tmp/wiredtigerz&quot; &quot;create&quot;))
-(define session (session-open connection))
-(define cursors (cursor-open* session posts))</code></pre><p><code>cursors</code> is an assoc that maps table name as symbol to its cursor and indices
-to their cursor. An extra <em>append</em> cursor will be created if the table has a
-single raw column. Index and append cursors are prefixed by the table name.
-Which means that the above <code>cursors</code> should contain the following keys:</p><pre><code>(list &apos;posts &apos;posts-append &apos;posts-published)</code></pre><p>Mind the fact that keys are symbols. Also <code>posts-published</code> cursor has <code>uid</code> as
-cursor&apos;s value since a projection was done. Leave the field empty for the
-default behavior. If there is no indices, leave the indices list empty.</p><h4>Simple database</h4><h5>(wiredtiger-open path . configs)</h5><p>Open database at <code>path</code>, create tables using <code>configs</code> if necessary and return
-a pair <code>(connection . session)</code> and a <code>cursors</code> assoc as returned
-by <code>cursor-open*</code>.</p><p>This procedure is useful in a context where you don&apos;t plan to use threads.</p><h5>(wiredtiger-close database)</h5><p>Shortcut procedure to close a database where <code>database</code> is a pair of connection
-and session.</p><h4>Context</h4><p>Context is made of <code>&lt;session&gt;</code> and <code>cursors</code> assoc. This is useful in multithread
-settings if you don&apos;t need to open multiple cursors for the same table.</p><h4>(context-open connection . configs)</h4><p><code>cursor-open*</code> sister procedure that will open a session and <code>cursors</code> assoc
-and return a context.</p><h4>(context-session context)</h4><p>Return the session associated with <code>context</code></p><h4>(context-ref context name)</h4><p>Return the cursor <code>name</code> from <code>context</code>.</p><h4>transactions</h4><p>Use <code>(context-begin context)</code>, <code>(context-commit context)</code> and
-<code>(context-rollback context)</code> to work with transactions.</p><p>There is macro helper <code>(with-transaction context e ...)</code> that begin and
-commit a transaction at end.</p><h4>Cursor navigation</h4><h5>(cursor-value-ref* cursor . key)</h5><p>Retreive the value associated with key in cursor.</p><h5>(cursor-insert* cursor key value)</h5><p>Insert <code>value</code> at <code>key</code> using cursor. If <code>key</code> is <code>#nil</code>, insert the <code>value</code>
-directly.</p><h5>(cursor-update* cursor key value)</h5><p>Update <code>key</code> with <code>value</code> using <code>cursor</code>.</p><h5>(cursor-remove* cursor . key)</h5><p>Remove <code>key</code> using <code>cursor</code>.</p><h5>(cursor-search* cursor . key)</h5><p>Search <code>key</code> using <code>cursor</code>.</p><h5>(cursor-search-near* cursor . key-prefix)</h5><p>Prepare <code>cursor</code> for forward search using <code>key-prefix</code>.</p><h5>(cursor-range cursor . key-prefix)</h5><p>Return the list of key/value pairs that match <code>key-prefix</code> using <code>cursor</code>.</p></div><p><small>cc-by-nc-sa</small></p></body></html>
+ ((published-at (published-at) (uid)))))</code></pre><p>This is reference through the API as <code>config</code> argument or <code>configs</code>
+when the procedure expects a list of schemas.</p><p>Have a look at the
+<a href="http://source.wiredtiger.com/develop/schema.html#schema_index_projections">official documentation</a>
+to learn what projections are.</p><h3>Reference API</h3><h4>(scm-&gt;string scm)</h4><p>Write a scm value to a string.</p><h4>(string-&gt;scm string)</h4><p>Read a scm value form a string.</p><h4>&lt;env&gt;</h4><h5>(env-open* path configs) -&gt; env</h5><p>Open and init an environment at <code>PATH</code> using <code>configs</code> table
+schemas. This is will create the tables specified by <code>configs</code> if
+required and return an <code>&lt;env&gt;</code> record.</p><p><code>&lt;env&gt;</code> records are threadsafe.</p><h5>(env-close env)</h5><p>Close the environment.</p><h5>(with-context env body ...)</h5><p>Set for the dynamic state a <code>&lt;context&gt;</code> as current <em>context</em>. You can
+then use <code>call-with-cursor</code> to use a cursor from that context. You can also
+use <code>context-begin</code>, <code>context-commit</code> and <code>context-rollback</code> or most
+likely the sugar syntax <code>with-transaction</code> to manipulate the
+transaction state.</p><h4>(call-with-cursor name proc)</h4><p>Calls <code>PROC</code> with the cursor named <code>NAME</code> inside the current context.</p><p>Must be called inside a <code>with-context</code> or <code>with-env</code>.</p><p><code>PROC</code> <em>can not</em> be lazy, the operations on the cursor must be
+finished when it returns and it must reset the cursor if needed.</p><h5>(with-env env body ...)</h5><p>Sugar syntax to use an environment, set the current context and close
+the environment it when finished.</p><h5>(with-transaction body ...)</h5><p>Execute <code>BODY ...</code> inside a transaction, can throw a <code>wiredtiger</code>
+exception.  If <code>BODY ...</code> throw an exception. It&apos;s catched, the
+transaction is rollbacked and the exception is re-throw.</p><h4>Cursor navigation</h4><h5>(cursor-next* cursor)</h5><p>Calls <code>cursor-next</code> and return <code>#false</code> if <code>wiredtiger</code> exception is
+thrown. This usually (all the time?) means that there is not next
+record.</p><h5>(cursor-prev* cursor)</h5><p>Calls <code>cursor-prev</code> and return <code>#false</code> if <code>wiredtiger</code> exception is
+thrown. This usually (all the time?) means that there is not previous
+record.</p><h5>(cursor-value-ref* cursor . key)</h5><p>Retreive the value associated with key in cursor.</p><h5>(cursor-insert* cursor key value)</h5><p>Insert <code>VALUE</code> at <code>KEY</code> using <code>CURSOR</code>. If the cursor was opened in
+<em>append</em> mode you must pass <code>#nil</code> or <code>&apos;()</code> as <code>KEY</code>.</p><h5>(cursor-update* cursor key value)</h5><p>Update <code>KEY</code> with <code>VALUE</code> using <code>CURSOR</code>.</p><h5>(cursor-remove* cursor . key)</h5><p>Remove <code>KEY</code> using <code>CURSOR</code>.</p><h5>(cursor-search* cursor . key)</h5><p>Search <code>KEY</code> using <code>CURSOR</code>.</p><h5>(cursor-search-near* cursor . key-prefix)</h5><p>Prepare <code>CURSOR</code> for forward search using <code>KEY-PREFIX</code>.</p><h5>(cursor-range cursor . key-prefix)</h5><p>Return the list of <strong>values</strong> that match <code>KEY-PREFIX</code> using <code>CURSOR</code>.</p><h5>(cursor-range-prefix cursor . key-prefix)</h5><p>Return the list of <strong>key/value pairs</strong> that match <code>KEy-PREFIX</code> using <code>CURSOR</code>.</p></div><p><small>cc-by-nc-sa</small></p></body></html>

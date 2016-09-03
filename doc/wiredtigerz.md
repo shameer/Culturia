@@ -10,14 +10,13 @@ cursor on them. It provides a few helpers for common patterns.
 `wiredtigerz` module can be found in
 [culturia repository](https://github.com/amirouche/Culturia/blob/master/culturia/wiredtigerz.scm).
 
-### Reference API
+### Table schema
 
-#### (session-create* session . configs)
+A table a schema is the specification for a given wiredtiger table.
 
-`session-create*` will create the tables and indices defined declarativly in
-`configs`. a `config` must looks like the following:
+It can be described as follow:
 
-```
+```scheme
 (table-name
  (key assoc as (column-name . column-type))
  (value assoc as (column-name . column-type))
@@ -30,14 +29,14 @@ cursor on them. It provides a few helpers for common patterns.
 
 - `string`
 
-- `unsigned-integer`
+- `unsigned-integer` or `positive-integer`
 
 - `integer`
 
 - `raw`
 
 An example of a configuration that defines an `posts` table with `uid`, `title`,
-`body`, `published-at` fields and one index one `published-at` with a project
+`body`, `published-at` fields and one index one `published-at` with a projectionñ
 on `uid` column:
 
 ```
@@ -47,86 +46,78 @@ on `uid` column:
  ((published-at (published-at) (uid)))))
 ```
 
-You can create the table and indices in one call using the following code:
+This is reference through the API as `config` argument or `configs`
+when the procedure expects a list of schemas.
 
-```
-(define connection (connection-open "/tmp/wiredtigerz" "create"))
-(define session (session-open connection))
-(session-create* session posts)
-(session-close session)
-```
+Have a look at the
+[official documentation](http://source.wiredtiger.com/develop/schema.html#schema_index_projections)
+to learn what projections are.
 
-#### (cursor-open* session . configs)
+### Reference API
 
-`(cursor-open* session config)` will open all the cursors related to a given
-`config` as an assoc.
+#### (scm->string scm)
 
-You can open cursors over the table and indices you created using
-`session-open*`. It use the same syntax and the same table declaration.
+Write a scm value to a string.
 
-```
-(define connection (connection-open "/tmp/wiredtigerz" "create"))
-(define session (session-open connection))
-(define cursors (cursor-open* session posts))
-```
+#### (string->scm string)
 
-`cursors` is an assoc that maps table name as symbol to its cursor and indices
-to their cursor. An extra *append* cursor will be created if the table has a
-single raw column. Index and append cursors are prefixed by the table name.
-Which means that the above `cursors` should contain the following keys:
+Read a scm value form a string.
 
-```
-(list 'posts 'posts-append 'posts-published)
-```
+#### <env>
 
-Mind the fact that keys are symbols. Also `posts-published` cursor has `uid` as
-cursor's value since a projection was done. Leave the field empty for the
-default behavior. If there is no indices, leave the indices list empty.
+##### (env-open* path configs) -> env
 
-#### Simple database
+Open and init an environment at `PATH` using `configs` table
+schemas. This is will create the tables specified by `configs` if
+required and return an `<env>` record. 
 
-##### (wiredtiger-open path . configs)
+`<env>` records are threadsafe.
 
-Open database at `path`, create tables using `configs` if necessary and return
-a pair `(connection . session)` and a `cursors` assoc as returned
-by `cursor-open*`.
+##### (env-close env)
 
-This procedure is useful in a context where you don't plan to use threads.
+Close the environment.
 
+##### (with-context env body ...)
 
-##### (wiredtiger-close database)
+Set for the dynamic state a `<context>` as current *context*. You can
+then use `call-with-cursor` to use a cursor from that context. You can also
+use `context-begin`, `context-commit` and `context-rollback` or most
+likely the sugar syntax `with-transaction` to manipulate the
+transaction state.
 
-Shortcut procedure to close a database where `database` is a pair of connection
-and session.
+#### (call-with-cursor name proc)
 
+Calls `PROC` with the cursor named `NAME` inside the current context.
 
-#### Context
+Must be called inside a `with-context` or `with-env`.
 
-Context is made of `<session>` and `cursors` assoc. This is useful in multithread
-settings if you don't need to open multiple cursors for the same table.
+`PROC` *can not* be lazy, the operations on the cursor must be
+finished when it returns and it must reset the cursor if needed.
 
-#### (context-open connection . configs)
+##### (with-env env body ...)
 
-`cursor-open*` sister procedure that will open a session and `cursors` assoc
-and return a context.
+Sugar syntax to use an environment, set the current context and close
+the environment it when finished.
 
-#### (context-session context)
+##### (with-transaction body ...)
 
-Return the session associated with `context`
-
-#### (context-ref context name)
-
-Return the cursor `name` from `context`.
-
-#### transactions
-
-Use `(context-begin context)`, `(context-commit context)` and
-`(context-rollback context)` to work with transactions.
-
-There is macro helper `(with-transaction context e ...)` that begin and
-commit a transaction at end.
+Execute `BODY ...` inside a transaction, can throw a `wiredtiger`
+exception.  If `BODY ...` throw an exception. It's catched, the
+transaction is rollbacked and the exception is re-throw.
 
 #### Cursor navigation
+
+##### (cursor-next* cursor)
+
+Calls `cursor-next` and return `#false` if `wiredtiger` exception is
+thrown. This usually (all the time?) means that there is not next
+record.
+
+##### (cursor-prev* cursor)
+
+Calls `cursor-prev` and return `#false` if `wiredtiger` exception is
+thrown. This usually (all the time?) means that there is not previous
+record.
 
 ##### (cursor-value-ref* cursor . key)
 
@@ -134,25 +125,30 @@ Retreive the value associated with key in cursor.
 
 ##### (cursor-insert* cursor key value)
 
-Insert `value` at `key` using cursor. If `key` is `#nil`, insert the `value`
-directly.
+Insert `VALUE` at `KEY` using `CURSOR`. If the cursor was opened in
+*append* mode you must pass `#nil` or `'()` as `KEY`.
 
 ##### (cursor-update* cursor key value)
 
-Update `key` with `value` using `cursor`.
+Update `KEY` with `VALUE` using `CURSOR`.
 
 ##### (cursor-remove* cursor . key)
 
-Remove `key` using `cursor`.
+Remove `KEY` using `CURSOR`.
 
 ##### (cursor-search* cursor . key)
 
-Search `key` using `cursor`.
+Search `KEY` using `CURSOR`.
 
 ##### (cursor-search-near* cursor . key-prefix)
 
-Prepare `cursor` for forward search using `key-prefix`.
+Prepare `CURSOR` for forward search using `KEY-PREFIX`.
 
 ##### (cursor-range cursor . key-prefix)
 
-Return the list of key/value pairs that match `key-prefix` using `cursor`.
+Return the list of **values** that match `KEY-PREFIX` using `CURSOR`.
+
+##### (cursor-range-prefix cursor . key-prefix)
+
+Return the list of **key/value pairs** that match `KEy-PREFIX` using `CURSOR`.
+

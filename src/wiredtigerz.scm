@@ -308,7 +308,7 @@ with cursor symbols as key and cursors as value"
     (session-close session)))
 
 (define-public (env-open* path configs)
-  "open and init an environment for ukv"
+  "open and init an environment"
   (let ((env (env-open path)))
     (for-each (cut env-config-add env <>) configs)
     (env-create env)
@@ -340,9 +340,9 @@ with cursor symbols as key and cursors as value"
 
 (export with-context)
 
-(define-syntax-rule (with-env env e ...)
+(define-syntax-rule (with-env env body ...)
   (let* ((env* env)
-         (out (with-context env* e ...)))
+         (out (with-context env* body ...)))
     (env-close env*)
     out))
 
