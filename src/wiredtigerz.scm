@@ -551,10 +551,10 @@ if KEY is not found"
 
 
 ;;;
-;;; generate-uid
+;;; generate-string
 ;;;
 
-(define (random-string size)
+(define-public (random-string size)
   "Generate and random identifier of length SIZE"
   (define CHARS "0123456789AZERTYUIOPQSDFGHJKLMWXCVBN")
   ;; append SIZE alphanumeric chars from `CHARS`
