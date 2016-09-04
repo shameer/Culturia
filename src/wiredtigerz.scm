@@ -304,6 +304,7 @@ with cursor symbols as key and cursors as value"
 (define-public (env-open* path configs)
   (let ((env (env-open path)))
     (for-each (cut env-config-add env <>) configs)
+    (env-create env)
     env))
 
 (define-public (env-create env)

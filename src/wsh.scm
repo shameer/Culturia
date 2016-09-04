@@ -121,7 +121,7 @@
             (else (loop (cdr nots) ((car nots) hits))))))))
     (('or . args) (delete-duplicates (append-map search/vm args)))
     (('not . arg) (lambda (hits)
-                    (lset-difference eq? hits search/vm)))))
+                    (lset-difference eq? hits (search/vm arg))))))
 
 (define (flatten lst)
   (let loop ((lst lst)
@@ -156,7 +156,7 @@
   (apply + (map (cut term-frequency <> doc-id) term-ids)))
 
 (define-public (search* query)
-  "retrieve sorted document ids for QUERY"
+  "retrieve sorted urls for QUERY"
   ;; compute hits for query
   (let ((hits (search/vm query)))
     ;; retrieve relevant query terms
@@ -172,169 +172,161 @@
 
 (use-modules (test-check))
 
-;; (when (or (getenv "CHECK") (getenv "CHECK_WSH"))
-;;   (test-check "index"
-;;     (with-env (apply env-open* (cons "/tmp/wt" *wsh*))
-;;       (not (null? (indeenx "http://example.net" "foo bar baz"))))
-;;     #t)
+(when (or (getenv "CHECK") (getenv "CHECK_WSH"))
+  (format #t "* check wsh\n")
+  
+  (test-check "index"
+    (with-env (env-open* "/tmp/wt" *wsh*)
+      (not (null? (index "http://example.net" "foo bar baz"))))
+    #t)
 
-;;   (test-check "query-terms 1"
-;;     (with-env (env-open
-;;         (index "http://example.net" "database")
-;;         (index "http://example.net" "spam")
-;;         (index "http://example.net" "egg")
-;;         (index "http://example.net" "postgresql")
-;;         (index "http://example.net" "pgsql")
-;;         (query-terms (search/and (search/term "database") (search/term "spam")))))
-;;     '(2 1))
+  (test-check "query-terms 1"
+    (with-env (env-open* "/tmp/wt" *wsh*)
+        (index "http://example.net" "database")
+        (index "http://example.net" "spam")
+        (index "http://example.net" "egg")
+        (index "http://example.net" "postgresql")
+        (index "http://example.net" "pgsql")
+        (query-terms (search/and (search/term "database") (search/term "spam"))))
+    '(2 1))
 
-;;   (test-check "query-terms 2"
-;;     (receive (cnx) (apply wiredtiger-open* (cons "/tmp/wt" *wsh*))
-;;       (with-cnx cnx
-;;         (index "http://example.net" "database")
-;;         (index "http://example.net" "spam")
-;;         (index "http://example.net" "egg")
-;;         (index "http://example.net" "postgresql")
-;;         (index "http://example.net" "pgsql")
-;;         (query-terms (search/and (search/term "database") (search/term "spam")
-;;                                      (search/or (search/term "pgsql") (search/term "postgresql"))))))
-;;     '(4 5 2 1))
+  (test-check "query-terms 2"
+    (with-env (env-open* "/tmp/wt" *wsh*)
+      (index "http://example.net" "database")
+      (index "http://example.net" "spam")
+      (index "http://example.net" "egg")
+      (index "http://example.net" "postgresql")
+      (index "http://example.net" "pgsql")
+      (query-terms (search/and (search/term "database") (search/term "spam")
+                               (search/or (search/term "pgsql") (search/term "postgresql")))))
+    '(4 5 2 1))
 
-;;   (test-check "query-terms 3"
-;;     (receive (cnx) (apply wiredtiger-open* (cons "/tmp/wt" *wsh*))
-;;       (with-cnx cnx
-;;         (index "http://example.net" "database")
-;;         (index "http://example.net" "spam")
-;;         (index "http://example.net" "egg")
-;;         (index "http://example.net" "postgresql")
-;;         (index "http://example.net" "pgsql")
-;;         (query-terms (search/and (search/term "database") (search/term "spam")
-;;                                      (search/or (search/term "pgsql") (search/term "postgresql"))
-;;                                      (search/not (search/term "spam"))))))
-;;     '(4 5 2 1))
+  (test-check "query-terms 3"
+    (with-env (env-open* "/tmp/wt" *wsh*)
+      (index "http://example.net" "database")
+      (index "http://example.net" "spam")
+      (index "http://example.net" "egg")
+      (index "http://example.net" "postgresql")
+      (index "http://example.net" "pgsql")
+      (query-terms (search/and (search/term "database") (search/term "spam")
+                               (search/or (search/term "pgsql") (search/term "postgresql"))
+                               (search/not (search/term "spam")))))
+    '(4 5 2 1))
 
-;;   (test-check "search/vm and/or"
-;;     (receive (cnx) (apply wiredtiger-open* (cons "/tmp/wt" *wsh*))
-;;       (with-cnx cnx
-;;         (index "http://example.net" "database & postgresql")
-;;         (index "http://example.net" "spam & pgsql")
-;;         (index "http://example.net" "spam & egg")
-;;         (index "http://example.net" "database & egg")
-;;         (index "http://example.net" "database & pgsql")
-;;         (search/vm (search/and (search/term "database") (search/or (search/term "postgresql")
-;;                                                                        (search/term "pgsql"))))))
-;;     '(5 1))
+  (test-check "search/vm and/or"
+    (with-env (env-open* "/tmp/wt" *wsh*)
+      (index "http://example.net" "database & postgresql")
+      (index "http://example.net" "spam & pgsql")
+      (index "http://example.net" "spam & egg")
+      (index "http://example.net" "database & egg")
+      (index "http://example.net" "database & pgsql")
+      (search/vm (search/and (search/term "database") (search/or (search/term "postgresql")
+                                                                 (search/term "pgsql")))))
+    '(5 1))
 
-;;   (test-check "search/vm or avoid duplicates"
-;;     (receive (cnx) (apply wiredtiger-open* (cons "/tmp/wt" *wsh*))
-;;       (with-cnx cnx
-;;         (index "http://example.net" "database")
-;;         (index "http://example.net" "wiredtiger & database")
-;;         (index "http://example.net" "wiredtiger")
+  (test-check "search/vm or avoid duplicates"
+    (with-env (env-open* "/tmp/wt" *wsh*)
+      (index "http://example.net" "database")
+      (index "http://example.net" "wiredtiger & database")
+      (index "http://example.net" "wiredtiger")
+      
+      (search/vm (search/or (search/term "database")
+                            (search/term "wiredtiger"))))
+    '(2 1 3))
 
-;;         (search/vm (search/or (search/term "database")
-;;                                   (search/term "wiredtiger")))))
-;;     '(2 1 3))
+  (test-check "search/vm avoid duplicates"
+    (with-env (env-open* "/tmp/wt" *wsh*)
+      (index "http://example.net" "wiredtiger & wiredtiger")
+      (search/vm (search/term "wiredtiger")))
+    '(1))
 
-;;   (test-check "search/vm avoid duplicates"
-;;     (receive (cnx) (apply wiredtiger-open* (cons "/tmp/wt" *wsh*))
-;;       (with-cnx cnx
-;;         (index "http://example.net" "wiredtiger & wiredtiger")
-;;         (search/vm (search/term "wiredtiger"))))
-;;     '(1))
+  (test-check "search/vm and/not"
+    (with-env (env-open* "/tmp/wt" *wsh*)
+      (index "http://example.net" "database & postgresql")
+      (index "http://example.net" "spam & pgsql")
+      (index "http://example.net" "spam & egg")
+      (index "http://example.net" "database & egg")
+      (index "http://example.net" "database & pgsql")
+      (search/vm (search/and (search/term "database")
+                             (search/not (search/term "egg")))))
+  '(5 1))
 
-;;   (test-check "search/vm and/not"
-;;     (receive (cnx) (apply wiredtiger-open* (cons "/tmp/wt" *wsh*))
-;;       (with-cnx cnx
-;;         (index "http://example.net" "database & postgresql")
-;;         (index "http://example.net" "spam & pgsql")
-;;         (index "http://example.net" "spam & egg")
-;;         (index "http://example.net" "database & egg")
-;;         (index "http://example.net" "database & pgsql")
-;;         (search/vm (search/and (search/term "database") (search/not (search/term "egg"))))))
-;;     '(5 1))
+  (test-check "search/vm and/not/and"
+    (with-env (env-open* "/tmp/wt" *wsh*)
+      (index "http://example.net" "database & egg")
+      (index "http://example.net" "database & spam & egg")
+      (index "http://example.net" "database & spam & egg")
+      (index "http://example.net" "database & egg")
+      (index "http://example.net" "database & spam")
+      (search/vm (search/and (search/term "database") (search/not (search/and (search/term "egg")
+                                                                              (search/term "spam"))))))
+    '(5 4 1))
 
-;;   (test-check "search/vm and/not/and"
-;;     (receive (cnx ctx) (apply wiredtiger-open* (cons "/tmp/wt" *wsh*))
-;;       (with-cnx cnx
-;;         (index "http://example.net" "database & egg")
-;;         (index "http://example.net" "database & spam & egg")
-;;         (index "http://example.net" "database & spam & egg")
-;;         (index "http://example.net" "database & egg")
-;;         (index "http://example.net" "database & spam")
-;;         (search/vm (search/and (search/term "database") (search/not (search/and (search/term "egg")
-;;                                                                                     (search/term "spam")))))))
-;;     '(5 4 1))
+  (test-check "search/vm and/not"
+    (with-env (env-open* "/tmp/wt" *wsh*)
+      (index "http://example.net" "database & postgresql")
+      (index "http://example.net" "spam & pgsql")
+      (index "http://example.net" "spam & egg")
+      (index "http://example.net" "database & egg")
+      (index "http://example.net" "database & pgsql")
+      (search/vm (search/and (search/term "database")
+                             (search/not (search/or (search/term "egg")
+                                                    (search/term "pgsql"))))))
+    '(1))
 
-;;   (test-check "search/vm and/not"
-;;     (receive (cnx ctx) (apply wiredtiger-open* (cons "/tmp/wt" *wsh*))
-;;       (with-cnx cnx
-;;         (index "http://example.net" "database & postgresql")
-;;         (index "http://example.net" "spam & pgsql")
-;;         (index "http://example.net" "spam & egg")
-;;         (index "http://example.net" "database & egg")
-;;         (index "http://example.net" "database & pgsql")
-;;         (search/vm (search/and (search/term "database") (search/not (search/or (search/term "egg")
-;;                                                                                    (search/term "pgsql")))))))
-;;     '(1))
+  (test-check "search/make-predicate 1"
+    (with-env (env-open* "/tmp/wt" *wsh*)
+      (index "http://example.net" "database & postgresql")
+      (index "http://example.net" "spam & pgsql")
+      (index "http://example.net" "spam & egg")
+      (index "http://example.net" "database & egg")
+      (index "http://example.net" "database & pgsql & spam")
+      (let* ((query (search/term "database"))
+             (predicate (search/make-predicate query)))
+        
+        (filter predicate (map (cut + 1 <>) (iota 5)))))
+  '(1 4 5))
 
-;;   (test-check "search/make-predicate 1"
-;;     (receive (cnx ctx) (apply wiredtiger-open* (cons "/tmp/wt" *wsh*))
-;;       (with-cnx cnx
-;;         (index "http://example.net" "database & postgresql")
-;;         (index "http://example.net" "spam & pgsql")
-;;         (index "http://example.net" "spam & egg")
-;;         (index "http://example.net" "database & egg")
-;;         (index "http://example.net" "database & pgsql & spam")
-;;         (let* ((query (search/term "database"))
-;;                (predicate (search/make-predicate query)))
+  (test-check "search/make-predicate 2"
+    (with-env (env-open* "/tmp/wt" *wsh*)
+      (index "http://example.net" "database & postgresql")
+      (index "http://example.net" "spam & pgsql")
+      (index "http://example.net" "spam & egg")
+      (index "http://example.net" "database & egg")
+      (index "http://example.net" "database & pgsql & spam")
+      (let* ((query (search/and (search/term "database")
+                                (search/term "postgresql")))
+             (predicate (search/make-predicate query)))
+        
+        (filter predicate (map (cut + 1 <>) (iota 5)))))
+  '(1))
 
-;;           (filter predicate (map (cut + 1 <>) (iota 5))))))
-;;     '(1 4 5))
+  (test-check "search/make-predicate 3"
+    (with-env (env-open* "/tmp/wt" *wsh*)
+      (index "http://example.net" "database & postgresql")
+      (index "http://example.net" "spam & pgsql")
+      (index "http://example.net" "spam & egg")
+      (index "http://example.net" "database & egg")
+      (index "http://example.net" "database & pgsql & spam")
+      (let* ((query (search/and (search/term "database")
+                                (search/or (search/term "postgresql")
+                                           (search/term "pgsql"))))
+             (predicate (search/make-predicate query)))
+        
+        (filter predicate (map (cut + 1 <>) (iota 5)))))
+  '(1 5))
 
-;;   (test-check "search/make-predicate 2"
-;;     (receive (cnx ctx) (apply wiredtiger-open* (cons "/tmp/wt" *wsh*))
-;;       (with-cnx cnx
-;;         (index "http://example.net" "database & postgresql")
-;;         (index "http://example.net" "spam & pgsql")
-;;         (index "http://example.net" "spam & egg")
-;;         (index "http://example.net" "database & egg")
-;;         (index "http://example.net" "database & pgsql & spam")
-;;         (let* ((query (search/and (search/term "database")
-;;                                   (search/term "postgresql")))
-;;                (predicate (search/make-predicate query)))
-
-;;           (filter predicate (map (cut + 1 <>) (iota 5))))))
-;;     '(1))
-
-;;   (test-check "search/make-predicate 3"
-;;     (receive (cnx ctx) (apply wiredtiger-open* (cons "/tmp/wt" *wsh*))
-;;       (with-cnx cnx
-;;         (index "http://example.net" "database & postgresql")
-;;         (index "http://example.net" "spam & pgsql")
-;;         (index "http://example.net" "spam & egg")
-;;         (index "http://example.net" "database & egg")
-;;         (index "http://example.net" "database & pgsql & spam")
-;;         (let* ((query (search/and (search/term "database")
-;;                                   (search/or (search/term "postgresql")
-;;                                              (search/term "pgsql"))))
-;;                (predicate (search/make-predicate query)))
-
-;;           (filter predicate (map (cut + 1 <>) (iota 5))))))
-;;     '(1 5))
-
-;;   (test-check "search*"
-;;     (receive (cnx ctx) (apply wiredtiger-open* (cons "/tmp/wt" *wsh*))
-;;       (with-cnx cnx
-;;         (index "http://example.net" "database & postgresql & pgsql")
-;;         (index "http://example.net" "database & postgresql")
-;;         (index "http://example.net" "spam & egg")
-;;         (index "http://example.net" "database & egg")
-;;         (index "http://example.net" "database & pgsql & spam")
-;;         (index "http://example.net" "database & postgresql & pgsql & database again")
-;;         (let ((query (search/and (search/term "database")
-;;                                  (search/or (search/term "postgresql")
-;;                                             (search/term "pgsql")))))
-;;           (search* query))))
-;;     '((6 . 4) (1 . 3) (5 . 2) (2 . 2)))
-;;   )
+  (test-check "search*"
+    (with-env (env-open* "/tmp/wt" *wsh*)
+      (index "http://database.postgresql.pgsql.net" "database & postgresql & pgsql")
+      (index "http://database.postgresql.net" "database & postgresql")
+      (index "http://spam.egg.net" "spam & egg")
+      (index "http://database.egg.net" "database & egg")
+      (index "http://database.pgsql.spam.net" "database & pgsql & spam")
+      (index "http://database.postgresql.pgsql.net/database" "database & postgresql & pgsql & database again")
+      (let ((query (search/and (search/term "database")
+                               (search/or (search/term "postgresql")
+                                          (search/term "pgsql")))))
+        (search* query)))
+    '(("http://database.postgresql.pgsql.net/database" . 4) ("http://database.postgresql.pgsql.net" . 3) ("http://database.pgsql.spam.net" . 2) ("http://database.postgresql.net" . 2)))
+)
