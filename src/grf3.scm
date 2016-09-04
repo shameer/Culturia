@@ -1,6 +1,11 @@
 ;; Copyright © 2016 Amirouche BOUBEKKI <amirouche@hypermove.net>
 (define-module (grf3))
 
+(use-modules (srfi srfi-1))
+(use-modules (srfi srfi-41))
+
+(use-modules (ice-9 match))
+
 (use-modules (plain))
 (use-modules (wiredtiger))
 (use-modules (wiredtigerz))
@@ -15,13 +20,32 @@
 
 (export edge-uid edge-assoc)
 
-(define %VERTEX 0)
-(define %EDGE 1)
+(define-public VERTEX 0)
+(define-public EDGE 1)
 
-(define-public (grf-create-vertex assoc)
-  (let ((assoc (acons '%kind %VERTEX assoc)))
+(define-public (get uid)
+  (let ((assoc (ukv-ref* uid)))
+    (if (eq? (assoc-ref assoc '%kind) VERTEX)
+        (make-vertex uid assoc)
+        (make-edge uid assoc))))
+
+(define-public (create-vertex assoc)
+  (let ((assoc (acons '%kind VERTEX assoc)))
     (let ((uid (ukv-add! assoc)))
       (make-vertex uid assoc))))
+
+(define (where key value)
+  (lambda (uid)
+    (equal? (ukv-ref uid key) value)))
+
+(define (from key value)
+  (list->stream (ukv-index-ref key value)))
+
+(define-public (get-or-create-vertex key value)
+  (let ((uids (stream->list (stream-filter (where '%kind VERTEX) (from key value)))))
+    (if (null? uids)
+        (create-vertex (acons key value '()))
+        (get (car uids)))))
 
 (define-public (vertex-set vertex key value)
   (let* ((assoc (vertex-assoc vertex))
@@ -31,8 +55,8 @@
 (define-public (vertex-ref vertex key)
   (assoc-ref (vertex-assoc vertex) key))
 
-(define-public (grf-create-edge start end assoc)
-  (let* ((assoc (acons '%kind %EDGE assoc))
+(define-public (create-edge start end assoc)
+  (let* ((assoc (acons '%kind EDGE assoc))
          (assoc (acons '%start (vertex-uid start) assoc))
          (assoc (acons '%end (vertex-uid end) assoc)))
     (let ((uid (ukv-add! assoc)))
@@ -52,7 +76,67 @@
 (define-public (edge-ref edge key)
   (assoc-ref (edge-assoc edge) key))
 
-(define-public (grf-save vertex-or-edge)
+(define-public (save vertex-or-edge)
   (let ((uid (if (vertex? vertex-or-edge) (vertex-uid vertex-or-edge) (edge-uid vertex-or-edge)))
         (assoc (if (vertex? vertex-or-edge) (vertex-assoc vertex-or-edge) (edge-assoc vertex-or-edge))))
     (ukv-update! uid assoc)))
+
+
+;;; tests
+
+(use-modules (test-check))
+
+
+(when (or (getenv "CHECK") (getenv "CHECK_GRF3"))
+  (format #t "* Testing grf3\n")
+  
+  (test-check "open database"
+    (with-env (env-open* "/tmp/wt" (list *ukv*))
+      42)
+    42)
+
+  (test-check "create vertex"
+    (with-env (env-open* "/tmp/wt" (list *ukv*))
+      (let ((vertex (create-vertex '((a . 42)))))
+        (vertex-ref (get (vertex-uid vertex)) 'a)))
+    42)
+
+  (test-check "create edge"
+    (with-env (env-open* "/tmp/wt" (list *ukv*))
+      (let* ((start (create-vertex '()))
+             (end (create-vertex '()))
+             (edge (create-edge start end '((a . 42)))))
+        (edge-ref (get (edge-uid edge)) 'a)))
+    42)
+
+  (test-check "get-or-create-vertex 1"
+    (with-env (env-open* "/tmp/wt" (list *ukv*))
+      (let ((vertex (get-or-create-vertex 'a 42)))
+        (vertex-ref (get (vertex-uid vertex)) 'a)))
+    42)
+
+  (test-check "get-or-create-vertex 2"
+    (with-env (env-open* "/tmp/wt" (list *ukv*))
+      (let ((a (get-or-create-vertex 'a 42)))
+        (let ((b (get-or-create-vertex 'a 42)))
+          (equal? (vertex-uid a) (vertex-uid b)))))
+    #t)
+
+  (test-check "save vertex"
+    (with-env (env-open* "/tmp/wt" (list *ukv*))
+      (let* ((a (get-or-create-vertex 'a 42))
+             (a (vertex-set a 'b 1337)))
+        (save a)
+        (vertex-ref (get (vertex-uid a)) 'b)))
+    1337)
+
+  (test-check "save edge"
+    (with-env (env-open* "/tmp/wt" (list *ukv*))
+      (let* ((start (create-vertex '()))
+             (end (create-vertex '()))
+             (edge (create-edge start end '((a . 42)))))
+        (save (edge-set edge 'b 1337))
+        (edge-ref (get (edge-uid edge)) 'b)))
+    1337)
+  
+  )

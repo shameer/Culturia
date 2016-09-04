@@ -22,10 +22,13 @@
                        ((value . string))
                        ((index (key value) (uid)))))
 
+(define-public (ukv-debug)
+  (call-with-cursor 'ukv cursor-debug))
+
 (define-public (ukv-ref uid key)
   (call-with-cursor 'ukv
     (lambda (cursor)
-      (car (cursor-value-ref* cursor key)))))
+      (string->scm (car (cursor-value-ref* cursor uid (symbol->string key)))))))
 
 (define assocify
   (match-lambda (((uid key) . (value))
