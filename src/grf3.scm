@@ -80,7 +80,8 @@
 (define-public (save vertex-or-edge)
   (let ((uid (if (vertex? vertex-or-edge) (vertex-uid vertex-or-edge) (edge-uid vertex-or-edge)))
         (assoc (if (vertex? vertex-or-edge) (vertex-assoc vertex-or-edge) (edge-assoc vertex-or-edge))))
-    (ukv-update! uid assoc)))
+    (ukv-update! uid assoc))
+  vertex-or-edge)
 
 
 ;;; tests
