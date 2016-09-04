@@ -5,6 +5,7 @@
 (use-modules (srfi srfi-41))
 
 (use-modules (ice-9 match))
+(use-modules (ice-9 receive))
 
 (use-modules (plain))
 (use-modules (wiredtiger))
@@ -44,8 +45,8 @@
 (define-public (get-or-create-vertex key value)
   (let ((uids (stream->list (stream-filter (where '%kind VERTEX) (from key value)))))
     (if (null? uids)
-        (create-vertex (acons key value '()))
-        (get (car uids)))))
+        (values #true (create-vertex (acons key value '())))
+        (values #false (get (car uids))))))
 
 (define-public (vertex-set vertex key value)
   (let* ((assoc (vertex-assoc vertex))
@@ -109,22 +110,22 @@
         (edge-ref (get (edge-uid edge)) 'a)))
     42)
 
-  (test-check "get-or-create-vertex 1"
+  (test-check "get-or-create-vertex new true"
     (with-env (env-open* "/tmp/wt" (list *ukv*))
-      (let ((vertex (get-or-create-vertex 'a 42)))
-        (vertex-ref (get (vertex-uid vertex)) 'a)))
-    42)
+      (receive (new vertex) (get-or-create-vertex 'a 42)
+        new))
+    #true)
 
-  (test-check "get-or-create-vertex 2"
+  (test-check "get-or-create-vertex new false"
     (with-env (env-open* "/tmp/wt" (list *ukv*))
-      (let ((a (get-or-create-vertex 'a 42)))
-        (let ((b (get-or-create-vertex 'a 42)))
-          (equal? (vertex-uid a) (vertex-uid b)))))
-    #t)
+      (receive (new vertex) (get-or-create-vertex 'a 42)
+        (receive (new vertex) (get-or-create-vertex 'a 42)
+          new)))
+    #false)
 
   (test-check "save vertex"
     (with-env (env-open* "/tmp/wt" (list *ukv*))
-      (let* ((a (get-or-create-vertex 'a 42))
+      (let* ((a (create-vertex '((a . 42))))
              (a (vertex-set a 'b 1337)))
         (save a)
         (vertex-ref (get (vertex-uid a)) 'b)))
