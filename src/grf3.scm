@@ -35,19 +35,6 @@
     (let ((uid (ukv-add! assoc)))
       (make-vertex uid assoc))))
 
-(define (where key value)
-  (lambda (uid)
-    (equal? (ukv-ref uid key) value)))
-
-(define (from key value)
-  (list->stream (ukv-index-ref key value)))
-
-(define-public (get-or-create-vertex key value)
-  (let ((uids (stream->list (stream-filter (where '%kind VERTEX) (from key value)))))
-    (if (null? uids)
-        (values #true (create-vertex (acons key value '())))
-        (values #false (get (car uids))))))
-
 (define-public (vertex-set vertex key value)
   (let* ((assoc (vertex-assoc vertex))
          (assoc (acons key value (alist-delete key assoc))))
@@ -83,7 +70,67 @@
     (ukv-update! uid assoc))
   vertex-or-edge)
 
+;;; traversi streams
 
+(define (list->traversi lst)
+  (let loop ((lst lst))
+    (lambda ()
+      (if (null? lst)
+          '()
+          (cons (cons (car lst) '()) (loop (cdr lst)))))))
+
+(define (traversi->list traversi)
+  (let loop ((traversi traversi)
+             (out '()))
+    (match (traversi)
+      ('() (reverse out))
+      ((item . next) (loop next (cons (car item) out))))))
+
+(define (traversi-map proc traversi)
+  (let loop ((traversi traversi))
+    (lambda ()
+      (match (traversi)
+        ('() '())
+        ((item . next) (cons (cons (proc (car item)) item) (loop next)))))))
+
+(define (traversi-filter proc traversi)
+  (let loop1 ((traversi traversi))
+    (lambda ()
+      (let loop2 ((traversi traversi))
+        (match (traversi)
+          ('() '())
+          ((item . next) (if (proc (car item))
+                             (cons item (loop1 next))
+                             (loop2 next))))))))
+
+(define (traversi-parent traversi)
+  (let loop ((traversi traversi))
+    (lambda ()
+      (match (traversi)
+        ('() '())
+        ((item . next)
+         (let ((parents (cdr item)))
+           (if (null? parents)
+               (throw 'traversi "item has no parent")
+               (cons parents (loop next)))))))))
+
+;;; traversi helpers
+
+(define (where? key value)
+  (lambda (uid)
+    (equal? (ukv-ref uid key) value)))
+
+(define (from key value)
+  (list->traversi (ukv-index-ref key value)))
+
+;;; other helpers
+
+(define-public (get-or-create-vertex key value)
+  (let ((uids (traversi->list (traversi-filter (where? '%kind VERTEX) (from key value)))))
+    (if (null? uids)
+        (values #true (create-vertex (acons key value '())))
+        (values #false (get (car uids))))))
+      
 ;;; tests
 
 (use-modules (test-check))
