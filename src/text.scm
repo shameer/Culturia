@@ -61,6 +61,6 @@
   (filter (lambda (word) (< 1 (string-length word))) words))
 
 ;; XXX: compose must be read from right to left
-(define string->tokens (compose filter-stopwords sanitize split string-downcase clean))
+(define string->tokens (compose sanitize split string-downcase clean))
 
 (define-public html->tokens (compose string->tokens html2text))
