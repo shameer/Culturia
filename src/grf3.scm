@@ -2,6 +2,7 @@
 (define-module (grf3))
 
 (use-modules (srfi srfi-1))
+(use-modules (srfi srfi-26))
 (use-modules (srfi srfi-41))
 
 (use-modules (ice-9 match))
@@ -182,6 +183,18 @@
           (cons (cons (car lst) parents)
                 (loop traversi (cdr lst) parents))))))
 
+(define-public (traversi-unique traversi)
+  (let ((seen '()))
+    (let loop1 ((traversi traversi))
+      (lambda ()
+        (let loop2 ((traversi traversi))
+          (match (traversi)
+            ('() '())
+            ((item . next) (if (list-index (cut equal? <> (car item)) seen)
+                               (loop2 next)
+                               (begin (set! seen (cons (car item) seen))
+                                      (cons item (loop1 next)))))))))))
+
 ;;; traversi helpers
 
 (define-public (vertices)
@@ -200,6 +213,10 @@
 (define-public (key name)
   (lambda (uid)
     (ukv-ref uid name)))
+
+(define-public (key? name value)
+  (lambda (uid)
+    (equal? (ukv-ref uid name) value)))
 
 (define-public incomings
   (lambda (uid)
@@ -294,6 +311,10 @@
   (test-check "traversi-cdr"
     (traversi->list (traversi-cdr (list->traversi (iota 5))))
     '(1 2 3 4))
+
+  (test-check "traversi-unique"
+    (traversi->list (traversi-unique (list->traversi '(1 1 2 2 3 3))))
+    '(1 2 3))
   
   (test-check "traversi-map"
     (traversi->list (traversi-map 1+ (list->traversi (iota 5))))
