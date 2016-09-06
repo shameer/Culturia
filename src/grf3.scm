@@ -103,7 +103,7 @@
                              (cons item (loop1 next))
                              (loop2 next))))))))
 
-(define-public (traversi-parent traversi)
+(define-public (traversi-backtrack traversi)
   (let loop ((traversi traversi))
     (lambda ()
       (match (traversi)
@@ -118,9 +118,11 @@
   (let loop ((traversi traversi)
              (count count))
     (lambda ()
-      (match (traversi)
-        ('() '())
-        ((item . next) (cons item (loop next (1- count))))))))
+      (if (eq? count 0)
+          '()
+          (match (traversi)
+            ('() '())
+            ((item . next) (cons item (loop next (1- count)))))))))
 
 (define-public (traversi-drop count traversi)
   (let loop ((traversi traversi)
@@ -134,7 +136,7 @@
            
 
 (define-public (traversi-paginator count traversi)
-  (throw 'grf3 "not implemented"))
+  (throw 'grf3 "not implemented error"))
 
 (define-public (traversi-length traversi)
   (let loop ((traversi traversi)
@@ -144,17 +146,25 @@
       ((item . next) (loop next (1+ count))))))
 
 (define-public (traversi-scatter traversi)
-  "take a traversi of lists and returns a traversi made of all the
+  "Take a traversi of lists and returns a traversi made of all the
    elements of all the lists. parents are inherited."
-  (let loop1 ((traversi traversi))
+  (let loop ((traversi traversi)
+             (lst '())
+             (parents '()))
     (lambda ()
-      (match (traversi)
-        ('() '())
-        ((item . next) (let loop2 ((lst item))
-                         (lambda ()
-                           (if (null? lst)
-                               (loop1 next)
-                               (cons (cons (car lst) item) (loop2 (cdr lst)))))))))))
+      (if (null? lst)
+          (match (traversi)
+            ('() '())
+            ((item . next)
+             (let ((lst (car item))
+                   (parents (cdr item)))
+               (if (null? lst)
+                   ((loop next '() '()))
+                   (cons (cons (car lst) parents)
+                         (loop next (cdr lst) parents))))))
+          (cons (cons (car lst) parents)
+                (loop traversi (cdr lst) parents))))))
+                
 ;;; traversi helpers
 
 (define-public (vertices)
@@ -254,5 +264,54 @@
         (save (edge-set edge 'b 1337))
         (edge-ref (get (edge-uid edge)) 'b)))
     1337)
+
+  (test-check "traversi basics"
+    (traversi->list (list->traversi (iota 5)))
+    '(0 1 2 3 4))
+
+  (test-check "traversi-map"
+    (traversi->list (traversi-map 1+ (list->traversi (iota 5))))
+    '(1 2 3 4 5))
+
+  (test-check "traversi-filter"
+    (traversi->list (traversi-filter odd? (list->traversi (iota 5))))
+    '(1 3))
+
+  (test-check "traversi-backtrack"
+    (traversi->list (traversi-backtrack (traversi-filter odd? (traversi-map 1+ (list->traversi (iota 5))))))
+    '(0 2 4))
+
+  (test-check "traversi-take"
+    (traversi->list (traversi-take 2 (list->traversi (iota 5))))
+    '(0 1))
+
+  (test-check "traversi-drop"
+    (traversi->list (traversi-drop 2 (list->traversi (iota 5))))
+    '(2 3 4))
+
+  (test-check "traversi-length"
+    (traversi-length (list->traversi (iota 5)))
+    5)
+
+  (test-check "traversi-scatter 1"
+    (traversi->list (traversi-scatter (list->traversi (list (iota 5)))))
+    '(0 1 2 3 4))
+
+  (test-check "traversi-scatter 2"
+    (traversi->list (traversi-scatter (list->traversi (list (iota 2) (iota 2)))))
+    '(0 1 0 1))
+
+  (test-check "traversi-scatter 3"
+    (traversi->list
+     (traversi-filter odd?
+                      (traversi-scatter (traversi-map iota (list->traversi (iota 3))))))
+    '(1))
+
+  (test-check "traversi-scatter 4"
+    (traversi->list
+     (traversi-backtrack
+      (traversi-filter odd?
+                       (traversi-scatter (traversi-map iota (list->traversi (iota 3)))))))
+    '(2))
 
   )
