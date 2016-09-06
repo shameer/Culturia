@@ -86,6 +86,16 @@
       ('() (reverse out))
       ((item . next) (loop next (cons (car item) out))))))
 
+(define-public (traversi-car traversi)
+  (match (traversi)
+    ('() (throw 'traversi "traversi is empty"))
+    ((item . next) (car item))))
+
+(define-public (traversi-cdr traversi)
+  (match (traversi)
+    ('() (throw 'traversi "traversi is empty"))
+    ((item . next) next)))
+
 (define-public (traversi-map proc traversi)
   (let loop ((traversi traversi))
     (lambda ()
@@ -133,14 +143,14 @@
 
 (define-public (traversi-drop count traversi)
   (let loop ((traversi traversi)
-              (count count))
+             (count count))
     (lambda ()
       (match (traversi)
         ('() '())
         ((item . next) (if (eq? count 0)
                            (cons item (loop next 0))
                            ((loop next (1- count)))))))))
-           
+
 
 (define-public (traversi-paginator count traversi)
   (throw 'grf3 "not implemented error"))
@@ -171,7 +181,7 @@
                          (loop next (cdr lst) parents))))))
           (cons (cons (car lst) parents)
                 (loop traversi (cdr lst) parents))))))
-                
+
 ;;; traversi helpers
 
 (define-public (vertices)
@@ -276,6 +286,15 @@
     (traversi->list (list->traversi (iota 5)))
     '(0 1 2 3 4))
 
+  
+  (test-check "traversi-car"
+    (traversi-car (list->traversi (iota 5)))
+    0)
+
+  (test-check "traversi-cdr"
+    (traversi->list (traversi-cdr (list->traversi (iota 5))))
+    '(1 2 3 4))
+  
   (test-check "traversi-map"
     (traversi->list (traversi-map 1+ (list->traversi (iota 5))))
     '(1 2 3 4 5))
