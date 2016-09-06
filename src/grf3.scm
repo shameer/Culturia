@@ -72,28 +72,28 @@
 
 ;;; traversi streams
 
-(define (list->traversi lst)
+(define-public (list->traversi lst)
   (let loop ((lst lst))
     (lambda ()
       (if (null? lst)
           '()
           (cons (cons (car lst) '()) (loop (cdr lst)))))))
 
-(define (traversi->list traversi)
+(define-public (traversi->list traversi)
   (let loop ((traversi traversi)
              (out '()))
     (match (traversi)
       ('() (reverse out))
       ((item . next) (loop next (cons (car item) out))))))
 
-(define (traversi-map proc traversi)
+(define-public (traversi-map proc traversi)
   (let loop ((traversi traversi))
     (lambda ()
       (match (traversi)
         ('() '())
         ((item . next) (cons (cons (proc (car item)) item) (loop next)))))))
 
-(define (traversi-filter proc traversi)
+(define-public (traversi-filter proc traversi)
   (let loop1 ((traversi traversi))
     (lambda ()
       (let loop2 ((traversi traversi))
@@ -103,7 +103,7 @@
                              (cons item (loop1 next))
                              (loop2 next))))))))
 
-(define (traversi-parent traversi)
+(define-public (traversi-parent traversi)
   (let loop ((traversi traversi))
     (lambda ()
       (match (traversi)
@@ -114,14 +114,81 @@
                (throw 'traversi "item has no parent")
                (cons parents (loop next)))))))))
 
+(define-public (traversi-take count traversi)
+  (let loop ((traversi traversi)
+             (count count))
+    (lambda ()
+      (match (traversi)
+        ('() '())
+        ((item . next) (cons item (loop next (1- count))))))))
+
+(define-public (traversi-drop count traversi)
+  (let loop ((traversi traversi)
+              (count count))
+    (lambda ()
+      (match (traversi)
+        ('() '())
+        ((item . next) (if (eq? count 0)
+                           (cons item (loop next 0))
+                           ((loop next (1- count)))))))))
+           
+
+(define-public (traversi-paginator count traversi)
+  (throw 'grf3 "not implemented"))
+
+(define-public (traversi-length traversi)
+  (let loop ((traversi traversi)
+             (count 0))
+    (match (traversi)
+      ('() count)
+      ((item . next) (loop next (1+ count))))))
+
+(define-public (traversi-scatter traversi)
+  "take a traversi of lists and returns a traversi made of all the
+   elements of all the lists. parents are inherited."
+  (let loop1 ((traversi traversi))
+    (lambda ()
+      (match (traversi)
+        ('() '())
+        ((item . next) (let loop2 ((lst item))
+                         (lambda ()
+                           (if (null? lst)
+                               (loop1 next)
+                               (cons (cons (car lst) item) (loop2 (cdr lst)))))))))))
 ;;; traversi helpers
 
-(define (where? key value)
+(define-public (vertices)
+  (list->traversi (ukv-index-ref '%kind VERTEX)))
+
+(define-public (edges)
+  (list->traversi (ukv-index-ref '%kind EDGE)))
+
+(define-public (from key value)
+  (list->traversi (ukv-index-ref key value)))
+
+(define-public (where? key value)
   (lambda (uid)
     (equal? (ukv-ref uid key) value)))
 
-(define (from key value)
-  (list->traversi (ukv-index-ref key value)))
+(define-public (key name)
+  (lambda (uid)
+    (ukv-ref uid name)))
+
+(define-public incomings
+  (lambda (uid)
+    (ukv-index-ref '%end uid)))
+
+(define-public outgoings
+  (lambda (uid)
+    (ukv-index-ref '%start uid)))
+
+(define-public start
+  (lambda (uid)
+    (ukv-ref uid '%start)))
+
+(define-public end
+  (lambda (uid)
+    (ukv-ref uid '%end)))
 
 ;;; other helpers
 
@@ -130,7 +197,7 @@
     (if (null? uids)
         (values #true (create-vertex (acons key value '())))
         (values #false (get (car uids))))))
-      
+
 ;;; tests
 
 (use-modules (test-check))
@@ -138,7 +205,7 @@
 
 (when (or (getenv "CHECK") (getenv "CHECK_GRF3"))
   (format #t "* Testing grf3\n")
-  
+
   (test-check "open database"
     (with-env (env-open* "/tmp/wt" (list *ukv*))
       42)
@@ -187,5 +254,5 @@
         (save (edge-set edge 'b 1337))
         (edge-ref (get (edge-uid edge)) 'b)))
     1337)
-  
+
   )
