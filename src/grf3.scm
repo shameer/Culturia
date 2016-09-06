@@ -93,6 +93,13 @@
         ('() '())
         ((item . next) (cons (cons (proc (car item)) item) (loop next)))))))
 
+(define-public (traversi-for-each proc traversi)
+  (let loop ((traversi traversi))
+    (let ((value (traversi)))
+      (unless (null? value)
+        (proc (caar value))
+        (loop (cdr value))))))
+
 (define-public (traversi-filter proc traversi)
   (let loop1 ((traversi traversi))
     (lambda ()
