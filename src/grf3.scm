@@ -195,6 +195,21 @@
                                (begin (set! seen (cons (car item) seen))
                                       (cons item (loop1 next)))))))))))
 
+(define (hash-increment ht key)
+  (let ((value (hash-ref ht key)))
+    (if (not value)
+        (hash-set! ht key 1)
+        (hash-set! ht key (1+ value)))))
+
+(define-public (traversi-group-count traversi)
+  (let ((groups (make-hash-table)))
+    (let loop ((traversi traversi))
+      (match (traversi)
+        ('() (sort (hash-map->list cons groups) (lambda (a b) (> (cdr a) (cdr b)))))
+        ((item . next)
+         (hash-increment groups (car item))
+         (loop next))))))
+
 ;;; traversi helpers
 
 (define-public (vertices)
@@ -303,7 +318,7 @@
     (traversi->list (list->traversi (iota 5)))
     '(0 1 2 3 4))
 
-  
+
   (test-check "traversi-car"
     (traversi-car (list->traversi (iota 5)))
     0)
@@ -315,7 +330,7 @@
   (test-check "traversi-unique"
     (traversi->list (traversi-unique (list->traversi '(1 1 2 2 3 3))))
     '(1 2 3))
-  
+
   (test-check "traversi-map"
     (traversi->list (traversi-map 1+ (list->traversi (iota 5))))
     '(1 2 3 4 5))
@@ -331,6 +346,10 @@
   (test-check "traversi-take"
     (traversi->list (traversi-take 2 (list->traversi (iota 5))))
     '(0 1))
+
+  (test-check "traversi-group-count"
+    (traversi-group-count (list->traversi '(1 1 1 2 2 3)))
+    '((1 . 3) (2 . 2) (3 . 1)))
 
   (test-check "traversi-drop"
     (traversi->list (traversi-drop 2 (list->traversi (iota 5))))
