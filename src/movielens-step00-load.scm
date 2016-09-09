@@ -24,13 +24,13 @@
 (define movies (traversi-map parse-movie (traversi-cdr (csv->rows "data/movielens/ml-latest-small/movies.csv"))))
 
 (define store-movie
-  (match-lambda 
+  (match-lambda
     ((id title genres) (let ((movie (create-vertex `((movie/id . ,id) (movie/title . ,title)))))
                        (let next ((genres genres))
                          (unless (null? genres)
                            (receive (new genre) (get-or-create-vertex 'genre (car genres))
                              (when new
-                               (save (vertex-set genre 'label genre)))
+                               (save (vertex-set genre 'label 'genre)))
                              (create-edge movie genre '((label . part-of))))
                            (display ".")
                            (next (cdr genres))))))))
