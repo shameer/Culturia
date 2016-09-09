@@ -28,7 +28,7 @@
     ((id title genres) (let ((movie (create-vertex `((movie/id . ,id) (movie/title . ,title)))))
                        (let next ((genres genres))
                          (unless (null? genres)
-                           (receive (new genre) (get-or-create-vertex 'genre (car genres))
+                           (receive (new genre) (get-or-create-vertex 'genre/title (car genres))
                              (when new
                                (save (vertex-set genre 'label 'genre)))
                              (create-edge movie genre '((label . part-of))))
