@@ -11,8 +11,8 @@
 		  (cut traversi-map start <>)
 		  ;; backtrack to edge uids
 		  (cut traversi-backtrack <>)
-		  ;; keep values that are equal? to 5.0
-		  (cut traversi-filter (lambda (x) (equal? 5.0 x)) <>)
+		  ;; keep values that are at least 4.0
+		  (cut traversi-filter (lambda (x) (<= 4.0 x)) <>)
 		  ;; fetch the 'rating/value of each edge
 		  (cut traversi-map (key 'rating/value) <>)
 		  ;; keep edges which have 'ratin as 'label
@@ -30,9 +30,13 @@
   (with-context env
     (let ((query (compose
                   (cut traversi-group-count <>)
+                  ;; retrieve movie vertex's title
                   (cut traversi-map (key 'movie/title) <>)
                   (cut traversi-map end <>)
-                  (cut traversi-filter (key? 'rating/value 5.0)  <>)
+                  ;; retrieve rating edges with a score of at least 4.0
+                  (cut traversi-backtrack <>)
+                  (cut traversi-filter (lambda (x) (<= 4.0 x)) <>)
+                  (cut traversi-map (key 'rating/value) <>)
                   (cut traversi-filter (key? 'label 'rating) <>)
                   (cut traversi-scatter <>)
                   (cut traversi-map outgoings <>)
@@ -40,3 +44,5 @@
       (list-head (query users) 10))))
 
 (for-each pk (users-top-likes users))
+
+(env-close env)
