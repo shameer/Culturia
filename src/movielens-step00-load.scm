@@ -13,7 +13,6 @@
 
 (define csv (make-csv-reader #\,))
 
-
 (define (csv->rows input)
   (traversi-map vector->list (list->traversi (call-with-input-file input csv))))
 
@@ -30,7 +29,9 @@
                        (let next ((genres genres))
                          (unless (null? genres)
                            (receive (new genre) (get-or-create-vertex 'genre (car genres))
-                             (create-edge genre movie '((label . genre))))
+                             (when new
+                               (save (vertex-set genre 'label genre)))
+                             (create-edge movie genre '((label . part-of))))
                            (display ".")
                            (next (cdr genres))))))))
 
@@ -49,8 +50,12 @@
 
 (define store-rating
   (match-lambda ((user/id movie/id rating)
-                 (receive (_ user) (get-or-create-vertex 'user/id user/id)
-                   (receive (_ movie) (get-or-create-vertex 'movie/id movie/id)
+                 (receive (new user) (get-or-create-vertex 'user/id user/id)
+                   (when new
+                     (save (vertex-set user 'label 'user)))
+                   (receive (new movie) (get-or-create-vertex 'movie/id movie/id)
+                     (when new
+                       (save (vertex-set movie 'label movie)))
                      (create-edge user movie `((label . rating) (rating/value . ,rating)))
                      (display "."))))))
 
