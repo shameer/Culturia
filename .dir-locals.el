@@ -3,6 +3,7 @@
          (tab-width . 2)
          (eval . (progn
                    (put 'with-cursor 'scheme-indent-function 1)
+                   (put 'with-directory 'scheme-indent-function 1)
                    (put 'with-env 'scheme-indent-function 1)
                    (put 'with-context 'scheme-indent-function 1)
                    (put 'match 'scheme-indent-function 1)
