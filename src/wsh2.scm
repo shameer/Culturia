@@ -54,14 +54,14 @@
                 (cut traversi-map outgoings <>)
                 ;; fetch position vertex
                 (cut traversi-map end <>)
-                (cut traversi-filter (key? 'label 'at))
+                (cut traversi-filter (key? 'label 'at) <>)
                 (cut traversi-scatter <>)
                 (cut traversi-map outgoings <>))))
     ;; exec query
     (traversi->list (query (from 'token/name token)))))
 
 (define-public (query/token token)
-  (cons 'token term))
+  (cons 'token token))
 
 (define-public (query/and . args)
   (cons 'and args))
@@ -112,7 +112,7 @@
 
 (define (query-terms% query)
   (match query
-    (('token . token) (token-uid term))
+    (('token . token) (token-uid token))
     (('and . args) (map query-terms% args))
     (('or . args) (map query-terms% args))
     (('not . arg) '())))
@@ -123,9 +123,7 @@
 
 (define (term-frequency term doc)
   "frequency of TERM-ID in DOC-ID"
-  (call-with-cursor 'inverted-index
-    (lambda (cursor)
-      (cursor-count-prefix cursor term-id doc-id 0))))
+  (throw 'not-implemented-error))
 
 (define (score term-ids doc-id)
   "score DOC-ID against TERM-IDS"
@@ -149,11 +147,30 @@
 (use-modules (test-check))
 
 (when (or (getenv "CHECK") (getenv "CHECK_WSH2"))
-  
+
   (test-check "shallow index test"
     (with-env (env-open* "/tmp/wt" (list *ukv*))
       (receive (new document) (get-or-create-vertex 'doc/id "http://example.net")
         (not (null? (index document "foo bar baz")))))
+    #t)
+
+  (test-check "search/token success"
+    (with-env (env-open* "/tmp/wt" (list *ukv*))
+      (receive (new document) (get-or-create-vertex 'doc/id "http://example.net")
+        (index document "wiredtiger database")
+        (equal? (search/token "wiredtiger") (list (vertex-uid document)))))
+    #t)
+
+  (test-check "search/token fail 0"
+    (with-env (env-open* "/tmp/wt" (list *ukv*))
+      (receive (new document) (get-or-create-vertex 'doc/id "http://example.net")
+        (index document "some database article")
+        (null? (search/token "wiredtiger"))))
+    #t)
+
+  (test-check "search/token fail 1"
+    (with-env (env-open* "/tmp/wt" (list *ukv*))
+      (null? (search/token "wiredtiger")))
     #t)
 
   )
