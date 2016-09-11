@@ -110,35 +110,48 @@
         '()
         (car uid))))
 
-(define (query-terms% query)
+(define (query-tokens% query)
   (match query
     (('token . token) (token-uid token))
-    (('and . args) (map query-terms% args))
-    (('or . args) (map query-terms% args))
+    (('and . args) (map query-tokens% args))
+    (('or . args) (map query-tokens% args))
     (('not . arg) '())))
 
-(define (query-terms query)
-  "convert QUERY to a list of relevant terms for computing the score"
-  (flatten (query-terms% query)))
+(define (query-tokens query)
+  "convert QUERY to a list of relevant tokens for computing the score"
+  (flatten (query-tokens% query)))
 
-(define (term-frequency term doc)
-  "frequency of TERM-ID in DOC-ID"
-  (throw 'not-implemented-error))
+(define (token-count token doc)
+  "Count of TOKEN in DOC"
+  (let ((query (compose
+                (cut traversi-filter (cut equal? token <>) <>)
+                ;; fetch tokens
+                (cut traversi-filter (key? 'label 'token) <>)
+                (cut traversi-map start <>)
+                (cut traversi-filter (key? 'label 'at) <>)
+                (cut traversi-scatter <>)
+                (cut traversi-map incomings <>)
+                ;; fetch positions
+                (cut traversi-filter (key? 'label 'position) <>)
+                (cut traversi-map start <>)
+                (cut traversi-filter (key? 'label 'part-of) <>)
+                (cut traversi-scatter <>)
+                (cut traversi-map incomings <>))))
+    (length (traversi->list (query (list->traversi (list doc)))))))
 
-(define (score term-ids doc-id)
-  "score DOC-ID against TERM-IDS"
-  (apply + (map (cut term-frequency <> doc-id) term-ids)))
+(define (score tokens doc)
+  "score DOC against TOKENS"
+  (apply + (map (cut token-count <> doc) tokens)))
 
-(define-public (search* query)
+(define-public (search query)
   "retrieve sorted document ids for QUERY"
   ;; compute hits for query
   (let ((hits (search/vm query)))
-    ;; retrieve relevant query terms
-    (let ((term-ids (query-terms query)))
-      ;; score every hits against terms
-      (let ((scores (map (cut score term-ids <>) hits)))
-        (let ((urls (map uid->url hits)))
-          (sort (map cons urls scores) (lambda (a b) (> (cdr a) (cdr b))) ))))))
+    ;; retrieve relevant query tokens
+    (let ((tokens (query-tokens query)))
+      ;; score every hits against tokens
+      (let ((scores (map (cut score tokens <>) hits)))
+        (sort (map cons hits scores) (lambda (a b) (> (cdr a) (cdr b))) )))))
 
 ;;;
 ;;; tests
@@ -173,4 +186,70 @@
       (null? (search/token "wiredtiger")))
     #t)
 
+
+  (test-check "search/vm search/token"
+    (with-env (env-open* "/tmp/wt" (list *ukv*))
+      (receive (new document) (get-or-create-vertex 'doc/id "http://example.net")
+        (index document "some database article")
+        (equal? (search/vm (query/token "database")) (list (vertex-uid document)))))
+    #t)
+
+  (test-check "search/vm search/token not found"
+    (with-env (env-open* "/tmp/wt" (list *ukv*))
+      (receive (new document) (get-or-create-vertex 'doc/id "http://example.net")
+        (index document "some database article")
+        (search/vm (query/token "wiredtiger"))))
+    '())
+
+  (test-check "search/vm search/and"
+    (with-env (env-open* "/tmp/wt" (list *ukv*))
+      (receive (new document) (get-or-create-vertex 'doc/id "http://example.net")
+        (index document "some wiredtiger database article")
+        (equal? (search/vm (query/and (query/token "wiredtiger") (query/token "database")))
+                (list (vertex-uid document)))))
+    #t)
+  
+  (test-check "search/vm search/not"
+    (with-env (env-open* "/tmp/wt" (list *ukv*))
+      (receive (_ a) (get-or-create-vertex 'doc/id "http://example.net")
+        (index a "some wiredtiger database article")
+        (receive (_ b) (get-or-create-vertex 'doc/id "http://spam.net")
+          (index b "some wiredtiger database article spam")
+          (equal? (search/vm (query/and (query/token "wiredtiger") (query/token "database")
+                                        (query/not (query/token "spam"))))
+                  (list (vertex-uid a))))))
+    #t)
+
+  (test-check "search/vm search/or"
+    (with-env (env-open* "/tmp/wt" (list *ukv*))
+      (receive (_ a) (get-or-create-vertex 'doc/id "http://example.net")
+        (index a "some wiredtiger database article")
+        (receive (_ b) (get-or-create-vertex 'doc/id "http://spam.net")
+          (index b "some postgresql database article")
+          (equal? (search/vm (query/or (query/token "wiredtiger") (query/token "postgresql")))
+                  (list (vertex-uid a) (vertex-uid b))))))
+    #t)
+
+    (test-check "search"
+      (with-env (env-open* "/tmp/wt" (list *ukv*))
+        (receive (_ a) (get-or-create-vertex 'doc/id "http://example.net")
+          (index a "some wiredtiger database article about wiredtiger")
+          (receive (_ b) (get-or-create-vertex 'doc/id "http://another-example.net")
+            (index b "some postgresql database article")
+            (receive (_ c) (get-or-create-vertex 'doc/id "http://spam.net")
+              (index c "some spam")
+              (equal? (search (query/or (query/token "wiredtiger") (query/token "postgresql")))
+                      (list (cons (vertex-uid a) 2) (cons (vertex-uid b) 1)))))))
+      #t)
+
+    (test-check "search empty results"
+      (with-env (env-open* "/tmp/wt" (list *ukv*))
+        (receive (_ a) (get-or-create-vertex 'doc/id "http://example.net")
+          (index a "some wiredtiger database article about wiredtiger")
+          (receive (_ b) (get-or-create-vertex 'doc/id "http://another-example.net")
+            (index b "some postgresql database article")
+            (receive (_ c) (get-or-create-vertex 'doc/id "http://spam.net")
+              (index c "some spam")
+              (search (query/token "unicorn"))))))
+      '())
   )
