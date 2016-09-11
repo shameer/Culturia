@@ -148,7 +148,7 @@ The next step will be to port whoosh/lucene to guile.
 
 Then I will restart thinking.
 
-#### 2016/08/28 - Quietly Confident
+#### 2016/09/11 - Quietly Confident
 
 - wiredtiger: add minimal collator support
 
@@ -192,32 +192,7 @@ poor. Two urls seems interesting:
 
 - [Concept Search by Fausto Giunchiglia et. al](http://www.ulakha.com/concept-search-eswc2009.html)
 
-- [Concept-based search and retrieval system (US 6675159 B1)](https://www.google.com/patents/US6675159)
-
-The later provide a good overview of the state of the art. That's why
-I discuss it in what follows.
-
-The summary of the patent is as follows:
-
-> A concept-based indexing and search system indexes collections of
-> documents with ontology-based predicate structures through automated
-> and/or human-assisted methods. The system extracts the concepts
-> behind user queries to return only those documents that match those
-> concepts. The concept based search and retrieval system comprehends
-> the intent behind a query from a user, and returns results matching
-> that intent. The system can perform off-line searches for unanswered
-> user queries and notify the user when a match is found.
-
-Basically what the patent claims is both an improvement in concept
-search and user interface. Queries can return no results but might
-return results in the future.  In the descibed system the user can
-receive results later. That's the main user interface improvement.
-Concept search is done using various techniques. The primary
-"innovation" that brings this patents is the use of both ontologies
-and NLP techniques to match queries to documents.
-
-There is also a review of already existing patents. Things that I recall
-while reading this document:
+Mixing both NLP and simple keyword search can lead to interesting results:
 
 - Building logical form of queries and documents can be useful.
 
@@ -227,27 +202,13 @@ while reading this document:
 - Semantic folding of documents leads to the construction of tuples
   that can take the form of (CONCEPT, RELATION, CONCEPT) for instance
   (OCTOPUS, IS_A, ANIMAL).  Which leads to think that common sens
-  should be infered from the indexed corpus.
+  should be infered from the indexed corpus. Also called logical triples.
 
-- They are at least another example given of tuple representation of
-  knowledge which I think is summed by the first point. They are also
-  called logical triples.
-
-- Query semantic folding can be done but with care. see below.
+- Query semantic folding can be done but with care.
 
 - Given different context, use different processings. For instance,
   they only extend a query's semantic e.g. via synonyms if there is no
   or little results in the vanilla query. Whereas semantic folding of
   documents is done all the time.
-
-- They also use semantic inference to provide similar results and take
-  the example of "what biological weapons are used by the USA". If no
-  results are found for that query, similar queries can have results
-  like "what weapons are used by the USA" or "what weapons are used by
-  countries near the USA".
-
-- They also use some Bayes algorithm to cluster documents. But this is
-  a supervised algorithm, it's not the kind of algorithm I'd like to use
-  in Culturia.
 
 I think that is the interesting things for now.
