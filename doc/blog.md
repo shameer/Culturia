@@ -35,13 +35,13 @@ into account:
 
 - and more interestingly provide an API that allows to browser the
   history of a single node and continue graph exploration from there.
-  
+
 **hierarchical hypergraph**: Simple hypergraph inheritance can use a
 similar model to version control system. You build a tree (or
 forest) using a set of tuples then that you cache in memory. Then
 when fetching atoms, you check that those atoms are part of the
 correct *tree branch path*
-  
+
 - *multiple parents hypergraph*: extending the above allowing parent atoms to
 have multiple parents. Not sure what the use of this
 
@@ -158,7 +158,7 @@ Then I will restart thinking.
   it is not useful for my immediate needs.
 
 - ipd: add priority queue table, this is meant to be mixed with
-  with guile-fibers somehow 
+  with guile-fibers somehow
 
 - add `wsh`: a boolean keyword search engine similar to whoosh.
 
@@ -178,3 +178,76 @@ of `grf`. This is **not** the most performant solution but it will but
 it will hopefully be the most easy to use. I will experiment with that
 solution and then maybe move (back) things to lower levels when
 required.
+
+- implement `ukv` assoc space databae on top of the new `env` API
+
+- implement `grf3` graphdb lib on top ukv
+
+- implement `wsh2` boolean keyword search engine on top of `grf3`
+
+I have been searching for information regarding concept search on the
+web.  The
+[wikipedia article](https://en.wikipedia.org/wiki/Concept_search) is
+poor. Two urls seems interesting:
+
+- [Concept Search by Fausto Giunchiglia et. al](http://www.ulakha.com/concept-search-eswc2009.html)
+
+- [Concept-based search and retrieval system (US 6675159 B1)](https://www.google.com/patents/US6675159)
+
+The later provide a good overview of the state of the art. That's why
+I discuss it in what follows.
+
+The summary of the patent is as follows:
+
+> A concept-based indexing and search system indexes collections of
+> documents with ontology-based predicate structures through automated
+> and/or human-assisted methods. The system extracts the concepts
+> behind user queries to return only those documents that match those
+> concepts. The concept based search and retrieval system comprehends
+> the intent behind a query from a user, and returns results matching
+> that intent. The system can perform off-line searches for unanswered
+> user queries and notify the user when a match is found.
+
+Basically what the patent claims is both an improvement in concept
+search and user interface. Queries can return no results but might
+return results in the future.  In the descibed system the user can
+receive results later. That's the main user interface improvement.
+Concept search is done using various techniques. The primary
+"innovation" that brings this patents is the use of both ontologies
+and NLP techniques to match queries to documents.
+
+There is also a review of already existing patents. Things that I recall
+while reading this document:
+
+- Building logical form of queries and documents can be useful.
+
+- Turning documents into question / answer pairs is something to be
+  investigated.
+
+- Semantic folding of documents leads to the construction of tuples
+  that can take the form of (CONCEPT, RELATION, CONCEPT) for instance
+  (OCTOPUS, IS_A, ANIMAL).  Which leads to think that common sens
+  should be infered from the indexed corpus.
+
+- They are at least another example given of tuple representation of
+  knowledge which I think is summed by the first point. They are also
+  called logical triples.
+
+- Query semantic folding can be done but with care. see below.
+
+- Given different context, use different processings. For instance,
+  they only extend a query's semantic e.g. via synonyms if there is no
+  or little results in the vanilla query. Whereas semantic folding of
+  documents is done all the time.
+
+- They also use semantic inference to provide similar results and take
+  the example of "what biological weapons are used by the USA". If no
+  results are found for that query, similar queries can have results
+  like "what weapons are used by the USA" or "what weapons are used by
+  countries near the USA".
+
+- They also use some Bayes algorithm to cluster documents. But this is
+  a supervised algorithm, it's not the kind of algorithm I'd like to use
+  in Culturia.
+
+I think that is the interesting things for now.
