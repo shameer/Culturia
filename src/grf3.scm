@@ -231,7 +231,9 @@
 
 (define-public (key? name value)
   (lambda (uid)
-    (equal? (ukv-ref uid name) value)))
+    (catch 'wiredtiger
+      (lambda () (equal? (ukv-ref uid name) value))
+      (lambda _ #f))))
 
 (define-public incomings
   (lambda (uid)
