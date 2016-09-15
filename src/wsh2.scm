@@ -1,4 +1,4 @@
-(define-module (wsh))
+(define-module (wsh2))
 
 (use-modules (ice-9 match))
 (use-modules (ice-9 receive))
@@ -44,7 +44,7 @@
             (create-edge position document '((label . part-of)))
             (next (cdr tokens) position)))))))
 
-(define (search/token token)
+(define-public (search/token token)
   "Return uids of vertices that are related to TOKEN"
   (let ((query (compose
                 ;; fetch document vertex
