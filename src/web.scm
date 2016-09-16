@@ -44,7 +44,7 @@
 (use-modules (wiredtigerz))
 (use-modules (ukv))
 (use-modules (grf3))
-(use-modules (wsh2))
+(use-modules (wsh))
 
 (use-modules (ice-9 hash-table))
 (use-modules (ice-9 regex))
@@ -732,14 +732,14 @@ example: \"/foo/bar\" yields '(\"foo\" \"bar\")."
                         (input (@ (type "submit") (value "hypermove"))))
                   (div (@ (id "hits"))
                        ,(map (lambda (hit)
-                               (let ((url (vertex-ref (get (car hit)) 'document/url)))
+                               (let ((url (car hit)))
                                  `(p (a (@ (href ,url)) ,url))))
                              hits)))))
 
 (define (view:index context)
   (case (context-method context)
     ((GET) (if (context-get context "query")
-               (let* ((hits (search (query/and (query/token (car (context-get context "query")))))))
+               (let* ((hits (search* (query/and (query/term (car (context-get context "query")))))))
                  (render-html (template:index-view hits)))
                (render-html (template:index-view '()))))
     (else (error))))
@@ -748,9 +748,8 @@ example: \"/foo/bar\" yields '(\"foo\" \"bar\")."
   (let* ((url (car (context-get context "url")))
          (response (curl url))
          (body (utf8->string (read-response-body (call-with-input-string response read-response)))))
-    (let ((document (create-vertex `((document/url . ,url)))))
-      (index document body)
-      (render-html (template "add" "ok")))))
+    (index url body)
+    (render-html (template "add" "ok"))))
 
 (define (handler request body)
   (define context (make-context request body))
@@ -761,5 +760,5 @@ example: \"/foo/bar\" yields '(\"foo\" \"bar\")."
     (_ (render-html (template "dunno" "dunno")))))
 
 
-(with-env (env-open* "/tmp/wt" (list *ukv*))
+(with-env (env-open* "/tmp/wt" *wsh*)
   (run-server handler))

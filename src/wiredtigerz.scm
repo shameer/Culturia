@@ -290,7 +290,7 @@ with cursor symbols as key and cursors as value"
 
 (define-record-type* <env> connection configs contexts mutex)
 
-(define *context* (make-unbound-fluid))
+(define-public *context* (make-unbound-fluid))
 
 (define-public (env-open path)
   (make-env (connection-open path "create") '() '() (make-mutex)))

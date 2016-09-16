@@ -63,7 +63,7 @@
                   (car (cursor-value-ref* cursor term)))))
     (lambda (key . args) '())))
 
-(define (search/token term)
+(define (search/term term)
   (let ((uid (term-uid term)))
     (if (null? uid)
         '()
@@ -107,7 +107,7 @@
 
 (define (search/vm query)
   (match query
-    (('term . term) (search/token term))
+    (('term . term) (search/term term))
     (('and . args)
      ;; separate 'not' for others
      (let* ((nots (filter (lambda (arg) (eq? (car arg) 'not)) args))
