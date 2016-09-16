@@ -22,16 +22,21 @@ h1 a {
 #container {
     max-width: 700px;
     padding: 15px;
+    padding-top: 150px;
 }
 
-#container input {
+#container #search {
+    text-align: right;
+}
+
+#container #search input {
     background: transparent;
     border: 1px solid white;
     padding: 5px;
     color: white;
 }
 
-#container input[type="submit"] {
+#container #search input[type="submit"] {
     border-left: 0px;
     border-style: dashed;
 }

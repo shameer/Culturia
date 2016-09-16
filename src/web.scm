@@ -38,10 +38,12 @@
 (use-modules (sxml simple))
 
 (use-modules (html))
+(use-modules (http))
 
 (use-modules (wiredtiger))
 (use-modules (wiredtigerz))
 (use-modules (ukv))
+(use-modules (grf3))
 (use-modules (wsh2))
 
 (use-modules (ice-9 hash-table))
@@ -721,23 +723,34 @@ example: \"/foo/bar\" yields '(\"foo\" \"bar\")."
   "get request method from CONTEXT"
   (request-method (assoc-ref context 'request)))
 
-;;; db and model 
+;;; db and model
 
-(define (template:index-view)
+(define (template:index-view hits)
   (template "index"
-            '(form (@ (method "GET"))
-                   (input (@ (type "text") (name "query")))
-                   (input (@ (type "submit") (value "hypermove"))))))
+            `(div (form (@ (id "search") (method "GET"))
+                        (input (@ (type "text") (name "query")))
+                        (input (@ (type "submit") (value "hypermove"))))
+                  (div (@ (id "hits"))
+                       ,(map (lambda (hit)
+                               (let ((url (vertex-ref (get (car hit)) 'document/url)))
+                                 `(p (a (@ (href ,url)) ,url))))
+                             hits)))))
 
 (define (view:index context)
   (case (context-method context)
-    ((GET) (pk (search/token (context-get context "query")))
-     (render-html (template:index-view)))
+    ((GET) (if (context-get context "query")
+               (let* ((hits (search (query/and (query/token (car (context-get context "query")))))))
+                 (render-html (template:index-view hits)))
+               (render-html (template:index-view '()))))
     (else (error))))
 
 (define (view:add context)
-  (pk (context-get context "url"))
-  (render-html (template "add" "ok")))
+  (let* ((url (car (context-get context "url")))
+         (response (curl url))
+         (body (utf8->string (read-response-body (call-with-input-string response read-response)))))
+    (let ((document (create-vertex `((document/url . ,url)))))
+      (index document body)
+      (render-html (template "add" "ok")))))
 
 (define (handler request body)
   (define context (make-context request body))
