@@ -44,7 +44,7 @@
             (create-edge position document '((label . part-of)))
             (next (cdr tokens) position)))))))
 
-(define-public (search/token token)
+(define (search/token token)
   "Return uids of vertices that are related to TOKEN"
   (let ((query (compose
                 ;; fetch document vertex
@@ -146,7 +146,7 @@
 (define-public (search query)
   "retrieve sorted document ids for QUERY"
   ;; compute hits for query
-  (let ((hits (search/vm query)))
+  (let ((hits (delete-duplicates (search/vm query))))
     ;; retrieve relevant query tokens
     (let ((tokens (query-tokens query)))
       ;; score every hits against tokens
@@ -252,4 +252,16 @@
               (index c "some spam")
               (search (query/token "unicorn"))))))
       '())
-  )
+
+    (test-check "search a token"
+      (with-env (env-open* "/tmp/wt" (list *ukv*))
+        (receive (_ a) (get-or-create-vertex 'doc/id "http://example.net")
+          (index a "some wiredtiger database article about wiredtiger")
+          (receive (_ b) (get-or-create-vertex 'doc/id "http://another-example.net")
+            (index b "some postgresql database article")
+            (receive (_ c) (get-or-create-vertex 'doc/id "http://spam.net")
+              (index c "some spam")
+              (equal? (caar (search (query/and (query/token "wiredtiger")))) (vertex-uid a))))))
+      #t)
+
+    )
