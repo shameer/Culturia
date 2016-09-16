@@ -77,16 +77,16 @@
     (lambda (cursor)
       (cursor-debug cursor))))
 
-(define-public (search/term term)
+(define-public (query/term term)
   (cons 'term term))
 
-(define-public (search/and . args)
+(define-public (query/and . args)
   (cons 'and args))
 
-(define-public (search/or . args)
+(define-public (query/or . args)
   (cons 'or args))
 
-(define-public (search/not arg)
+(define-public (query/not arg)
   (cons 'not arg))
 
 (define true? (cut eq? #t <>))
@@ -189,7 +189,7 @@
         (index "http://example.net" "egg")
         (index "http://example.net" "postgresql")
         (index "http://example.net" "pgsql")
-        (query-terms (search/and (search/term "database") (search/term "spam"))))
+        (query-terms (query/and (query/term "database") (query/term "spam"))))
     '(2 1))
 
   (test-check "query-terms 2"
@@ -199,8 +199,8 @@
       (index "http://example.net" "egg")
       (index "http://example.net" "postgresql")
       (index "http://example.net" "pgsql")
-      (query-terms (search/and (search/term "database") (search/term "spam")
-                               (search/or (search/term "pgsql") (search/term "postgresql")))))
+      (query-terms (query/and (query/term "database") (query/term "spam")
+                               (query/or (query/term "pgsql") (query/term "postgresql")))))
     '(4 5 2 1))
 
   (test-check "query-terms 3"
@@ -210,9 +210,9 @@
       (index "http://example.net" "egg")
       (index "http://example.net" "postgresql")
       (index "http://example.net" "pgsql")
-      (query-terms (search/and (search/term "database") (search/term "spam")
-                               (search/or (search/term "pgsql") (search/term "postgresql"))
-                               (search/not (search/term "spam")))))
+      (query-terms (query/and (query/term "database") (query/term "spam")
+                               (query/or (query/term "pgsql") (query/term "postgresql"))
+                               (query/not (query/term "spam")))))
     '(4 5 2 1))
 
   (test-check "search/vm and/or"
@@ -222,8 +222,8 @@
       (index "http://example.net" "spam & egg")
       (index "http://example.net" "database & egg")
       (index "http://example.net" "database & pgsql")
-      (search/vm (search/and (search/term "database") (search/or (search/term "postgresql")
-                                                                 (search/term "pgsql")))))
+      (search/vm (query/and (query/term "database") (query/or (query/term "postgresql")
+                                                                 (query/term "pgsql")))))
     '(5 1))
 
   (test-check "search/vm or avoid duplicates"
@@ -232,14 +232,14 @@
       (index "http://example.net" "wiredtiger & database")
       (index "http://example.net" "wiredtiger")
       
-      (search/vm (search/or (search/term "database")
-                            (search/term "wiredtiger"))))
+      (search/vm (query/or (query/term "database")
+                            (query/term "wiredtiger"))))
     '(2 1 3))
 
   (test-check "search/vm avoid duplicates"
     (with-env (env-open* "/tmp/wt" *wsh*)
       (index "http://example.net" "wiredtiger & wiredtiger")
-      (search/vm (search/term "wiredtiger")))
+      (search/vm (query/term "wiredtiger")))
     '(1))
 
   (test-check "search/vm and/not"
@@ -249,8 +249,8 @@
       (index "http://example.net" "spam & egg")
       (index "http://example.net" "database & egg")
       (index "http://example.net" "database & pgsql")
-      (search/vm (search/and (search/term "database")
-                             (search/not (search/term "egg")))))
+      (search/vm (query/and (query/term "database")
+                             (query/not (query/term "egg")))))
   '(5 1))
 
   (test-check "search/vm and/not/and"
@@ -260,8 +260,8 @@
       (index "http://example.net" "database & spam & egg")
       (index "http://example.net" "database & egg")
       (index "http://example.net" "database & spam")
-      (search/vm (search/and (search/term "database") (search/not (search/and (search/term "egg")
-                                                                              (search/term "spam"))))))
+      (search/vm (query/and (query/term "database") (query/not (query/and (query/term "egg")
+                                                                              (query/term "spam"))))))
     '(5 4 1))
 
   (test-check "search/vm and/not"
@@ -271,9 +271,9 @@
       (index "http://example.net" "spam & egg")
       (index "http://example.net" "database & egg")
       (index "http://example.net" "database & pgsql")
-      (search/vm (search/and (search/term "database")
-                             (search/not (search/or (search/term "egg")
-                                                    (search/term "pgsql"))))))
+      (search/vm (query/and (query/term "database")
+                             (query/not (query/or (query/term "egg")
+                                                    (query/term "pgsql"))))))
     '(1))
   
   (test-check "search/make-predicate 1"
@@ -283,7 +283,7 @@
       (index "http://example.net" "spam & egg")
       (index "http://example.net" "database & egg")
       (index "http://example.net" "database & pgsql & spam")
-      (let* ((query (search/term "database"))
+      (let* ((query (query/term "database"))
              (predicate (search/make-predicate query)))
         
         (filter predicate (map (cut + 1 <>) (iota 5)))))
@@ -296,8 +296,8 @@
       (index "http://example.net" "spam & egg")
       (index "http://example.net" "database & egg")
       (index "http://example.net" "database & pgsql & spam")
-      (let* ((query (search/and (search/term "database")
-                                (search/term "postgresql")))
+      (let* ((query (query/and (query/term "database")
+                                (query/term "postgresql")))
              (predicate (search/make-predicate query)))
         
         (filter predicate (map (cut + 1 <>) (iota 5)))))
@@ -310,9 +310,9 @@
       (index "http://example.net" "spam & egg")
       (index "http://example.net" "database & egg")
       (index "http://example.net" "database & pgsql & spam")
-      (let* ((query (search/and (search/term "database")
-                                (search/or (search/term "postgresql")
-                                           (search/term "pgsql"))))
+      (let* ((query (query/and (query/term "database")
+                                (query/or (query/term "postgresql")
+                                           (query/term "pgsql"))))
              (predicate (search/make-predicate query)))
         
         (filter predicate (map (cut + 1 <>) (iota 5)))))
@@ -326,9 +326,9 @@
       (index "http://database.egg.net" "database & egg")
       (index "http://database.pgsql.spam.net" "database & pgsql & spam")
       (index "http://database.postgresql.pgsql.net/database" "database & postgresql & pgsql & database again")
-      (let ((query (search/and (search/term "database")
-                               (search/or (search/term "postgresql")
-                                          (search/term "pgsql")))))
+      (let ((query (query/and (query/term "database")
+                               (query/or (query/term "postgresql")
+                                          (query/term "pgsql")))))
         (search* query)))
     '(("http://database.postgresql.pgsql.net/database" . 4) ("http://database.postgresql.pgsql.net" . 3) ("http://database.pgsql.spam.net" . 2) ("http://database.postgresql.net" . 2)))
 
@@ -339,6 +339,6 @@
       (index "http://example.net" "spam & egg")
       (index "http://example.net" "database & egg")
       (index "http://example.net" "database & pgsql")
-      (search/vm (search/and (search/term "wiredtiger"))))
+      (search/vm (query/and (query/term "wiredtiger"))))
     '())
 )
