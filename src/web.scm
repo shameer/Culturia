@@ -743,7 +743,7 @@ example: \"/foo/bar\" yields '(\"foo\" \"bar\")."
 (define (view:index context)
   (case (context-method context)
     ((GET) (if (context-get context "query")
-               (let* ((hits (search* (query/and (query/term (car (context-get context "query")))))))
+               (let* ((hits (search* (query (car (context-get context "query"))))))
                  (render-html (template:index-view hits)))
                (render-html (template:index-view '()))))
     (else (error))))
