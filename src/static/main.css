@@ -1,6 +1,7 @@
 body {
     display: flex;
     flex-direction: row-reverse;
+    flex-wrap: wrap;
     background: #9369bf;
     color: white;
     font-family: monospace;

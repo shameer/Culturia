@@ -678,7 +678,7 @@ example: \"/foo/bar\" yields '(\"foo\" \"bar\")."
       (link (@ (rel "stylesheet") (href "/static/normalize.css")))
       (link (@ (rel "stylesheet") (href "/static/main.css"))))
      (body (@ (class ,body-class))
-           (img (@ (id "logo") (src "static/her-ipod-style_by_aneglus_2002-2003.jpg")))
+           (img (@ (id "logo") (width "601") (height "1243") (src "static/her-ipod-style_by_aneglus_2002-2003.jpg")))
            (div (@ (id "container"))
                 (div (@ (id "container"))
                      ,body)
