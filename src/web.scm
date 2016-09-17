@@ -685,7 +685,7 @@ example: \"/foo/bar\" yields '(\"foo\" \"bar\")."
                 (div (@ (id "container"))
                      ,body)
                 (footer (@ (class "text-center"))
-                        (p (small "Copyright © 2015 Amirouche Boubekki"))))))))
+                        (p (small "Copyright © 2016 Amirouche Boubekki"))))))))
 
 ;;;
 ;;; static assets rendering
