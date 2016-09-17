@@ -75,9 +75,10 @@
 
 (define (comment-ref uid)
   (let* ((comment (uav-ref* uid))
-         (user (uav-ref* (car (uav-index-ref 'Users/Id (assoc-ref comment 'Comments/UserId))))))
+         (user (if (assoc-ref comment 'Comments/UserId)
+                   (uav-ref* (car (uav-index-ref 'Users/Id (assoc-ref comment 'Comments/UserId))))
+                   "")))
     (acons 'Comments/User user comment)))
-
 
 (define (post-ref uid)
   (let* ((post (uav-ref* uid))
@@ -148,15 +149,8 @@
   `(html
     (head
      (meta (@ (charset "utf-8")))
-     (title "stackoverflow")
-     (link (@ (rel "stylesheet")
-              (href "https://necolas.github.io/normalize.css/4.1.1/normalize.css")))
-     (link (@ (rel "stylesheet")
-              (href "https://fonts.googleapis.com/css?family=Gentium+Basic")))
-     (link (@ (rel "stylesheet")
-              (href "https://fonts.googleapis.com/css?family=Open+Sans")))
-     (link (@ (rel "stylesheet")
-              (href "../static/main.css"))))
+     (meta (@ (url ,(assoc-ref question 'Posts/Id))))
+     (title "stackoverflow - " ,(assoc-ref question 'Posts/Title)))
     (body (@ (class "question"))
           (div (@ (class "container"))
                (h1 "stackoverflow")
@@ -176,8 +170,6 @@
                                              ,(assoc-ref related 'Posts/Title))))
                                    (relateds question)))))))))
   
-
-
 (define (render-question questions-directory question)
   (catch #true
     (lambda ()
@@ -189,7 +181,6 @@
           (lambda (port)
             (sxml->html (template:question question) port)))))
     (lambda _ (format #t "** failed"))))
-
 
 (define (render work)
   (let* ((db (path-join work "db"))
@@ -210,8 +201,6 @@
                (questions (stream-map question-ref uids)))
           (stream-for-each (cut render-question questions-directory <>) questions))))))
     
-
-
 (load "stackoverflow")
 (render "stackoverflow")
 
