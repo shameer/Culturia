@@ -37,7 +37,10 @@
 
 (use-modules (sxml simple))
 
+(use-modules (htmlprag))
+
 (use-modules (html))
+(use-modules (text))
 (use-modules (http))
 
 (use-modules (wiredtiger))
@@ -75,7 +78,6 @@
           (() (list->string (reverse out)))))))
 
 (define decode (compose unhex spacy))
-
 
 (define (acons-list k v alist)
   (let ((value (assoc-ref alist k)))
@@ -725,16 +727,20 @@ example: \"/foo/bar\" yields '(\"foo\" \"bar\")."
 
 ;;; db and model
 
+(define (template:result hits)
+  (match (document-ref (car hits))
+    ((title snippet) `(a (@ (href ,(car hits)))
+                         (p ,snippet)
+                         (p (@ (class "link")) ,(car hits))))))
+
+
 (define (template:index-view hits)
   (template "index"
             `(div (form (@ (id "search") (method "GET"))
                         (input (@ (type "text") (name "query")))
                         (input (@ (type "submit") (value "hypermove"))))
                   (div (@ (id "hits"))
-                       ,(map (lambda (hit)
-                               (let ((url (car hit)))
-                                 `(p (a (@ (href ,url)) ,url))))
-                             hits)))))
+                       ,(map template:result hits)))))
 
 (define (view:index context)
   (case (context-method context)
@@ -744,11 +750,21 @@ example: \"/foo/bar\" yields '(\"foo\" \"bar\")."
                (render-html (template:index-view '()))))
     (else (error))))
 
-(define (view:add context)
-  (let* ((url (car (context-get context "url")))
-         (response (curl url))
+(define (remove-newlines string)
+  (string-map (lambda (char) (if (equal? char #\newline) #\space char)) string))
+
+(define (index* url)
+  (let* ((response (curl url))
          (body (utf8->string (read-response-body (call-with-input-string response read-response)))))
-    (index url body)
+    (let ((snippet (remove-newlines (string-take (html2text body) 200))))
+      (let* ((html (html->sxml body))
+             (title (car ((sxpath '(// title *text*)) html))))
+        (add-document url title snippet)
+        (index url body)))))
+
+(define (view:add context)
+  (let* ((url (car (context-get context "url"))))
+    (index* url)
     (render-html (template "add" "ok"))))
 
 (define (handler request body)

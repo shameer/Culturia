@@ -15,7 +15,7 @@
 
 (define open-process (@@ (ice-9 popen) open-process))
 
-(define (html2text string)
+(define-public (html2text string)
   (with-error-to-file "/dev/null"
     (lambda ()
       (call-with-values (lambda () (open-process OPEN_BOTH "html2text"))

@@ -3,6 +3,8 @@ body {
     flex-direction: row-reverse;
     background: #9369bf;
     color: white;
+    font-family: monospace;
+    font-size: 16px;
 }
 
 a:link, a:active {
@@ -39,4 +41,32 @@ h1 a {
 #container #search input[type="submit"] {
     border-left: 0px;
     border-style: dashed;
+}
+
+#container #hits {
+    margin-top: 30px;
+}
+
+#container #hits a:link {
+    display: block;
+    text-decoration: none;
+    opacity: 0.8;
+    text-align: justify;
+
+    margin-bottom: 15px;
+    padding-bottom: 15px;
+    border-bottom: 1px dashed white;
+}
+
+#container #hits a p {
+    margin: 0px;
+}
+
+#container #hits a p.link {
+    font-size: 0.9em;
+}
+
+#container #hits a:hover {
+    opacity: 1;
+    color: white;
 }

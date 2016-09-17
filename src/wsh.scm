@@ -7,10 +7,16 @@
 
 (use-modules (wiredtigerz))
 (use-modules (wiredtiger))
+
 (use-modules (text))
 
 
-(define-public *wsh* '((urls
+(define-public *wsh* '((documents
+                        ((url . string))
+                        ((title . string)
+                         (snippet . string))
+                        ())
+                       (urls
                         ((uid . record))
                         ((url . string))
                         ())
@@ -24,6 +30,16 @@
                          (position . unsigned-integer))
                         ((nothing . bytes))
                         ((positions (url-uid position) (term))))))
+
+(define-public (add-document url title snippet)
+  (call-with-cursor 'documents
+    (lambda (cursor)
+      (cursor-insert* cursor (list url) (list title snippet)))))
+
+(define-public (document-ref url)
+  (call-with-cursor 'documents
+    (lambda (cursor)
+      (cursor-value-ref* cursor url))))
 
 (define (index-term-with-position url-uid)
   (match-lambda
@@ -49,7 +65,6 @@
         (let* ((terms (html->tokens html))
                (terms+positions (zip terms (iota (length terms)))))
           (for-each (index-term-with-position url-uid) terms+positions))))))
-
 
 (define (uid->url uid)
   (call-with-cursor 'urls
