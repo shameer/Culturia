@@ -106,6 +106,15 @@
 (define-public (query/not arg)
   (cons 'not arg))
 
+(define (query% token)
+  (if (string-prefix? "-" token)
+      (query/not (query/term (string-drop token 1)))
+      (query/term token)))
+
+(define-public (query string)
+  (let ((tokens (filter (lambda (x) (not (equal? x ""))) (string-split string #\space))))
+    (apply query/and (map query% tokens))))
+        
 (define true? (cut eq? #t <>))
 
 (define (search/make-predicate arg)
@@ -358,4 +367,8 @@
       (index "http://example.net" "database & pgsql")
       (search/vm (query/and (query/term "wiredtiger"))))
     '())
+
+  (test-check "query"
+    (query "abc def -xxx")
+    '(and (term . "abc") (term . "def") (not . (term . "xxx"))))
 )
