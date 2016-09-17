@@ -22,7 +22,6 @@
 
 (use-modules (rnrs bytevectors))
 
-(use-modules (sxml xpath))
 (use-modules (ice-9 iconv))
 (use-modules (ice-9 match))
 (use-modules (ice-9 receive))
@@ -36,8 +35,9 @@
 (use-modules (web uri))
 
 (use-modules (sxml simple))
+(use-modules ((sxml xpath) #:select (sxpath)))
 
-(use-modules (htmlprag))
+(use-modules ((htmlprag) #:select (html->sxml)))
 
 (use-modules (html))
 (use-modules (text))
@@ -45,8 +45,6 @@
 
 (use-modules (wiredtiger))
 (use-modules (wiredtigerz))
-(use-modules (ukv))
-(use-modules (grf3))
 (use-modules (wsh))
 
 (use-modules (ice-9 hash-table))
@@ -750,21 +748,107 @@ example: \"/foo/bar\" yields '(\"foo\" \"bar\")."
                (render-html (template:index-view '()))))
     (else (error))))
 
+;;; index url
+
 (define (remove-newlines string)
   (string-map (lambda (char) (if (equal? char #\newline) #\space char)) string))
 
 (define (index* url)
   (let* ((response (curl url))
          (body (utf8->string (read-response-body (call-with-input-string response read-response)))))
-    (let ((snippet (remove-newlines (string-take (html2text body) 200))))
+    (let* ((string (html2text body))
+           (snippet (if (< 200 (string-length string)) (remove-newlines (string-take string 200)) string)))
       (let* ((html (html->sxml body))
              (title (car ((sxpath '(// title *text*)) html))))
         (add-document url title snippet)
-        (index url body)))))
+        (index url body)
+        html))))
 
 (define (view:add context)
   (let* ((url (car (context-get context "url"))))
     (index* url)
+    (render-html (template "add" "ok"))))
+
+;;; index domain
+
+(define uri-domain (compose uri-host string->uri))
+
+(define (extract-href sxml)
+  (map cadr ((sxpath '(// a @ href)) sxml)))
+
+(define (unsupported-href href)
+  (not (or (string-prefix? "#" href)
+           (string-prefix? "mailto:" href))))
+
+(define (url-domain url)
+  (string-take url
+               (cond
+                ((string-prefix? "http://" url)
+                 (let ((has-slash (string-index (string-drop url 7) #\/)))
+                   (if has-slash
+                       (+ 7 has-slash)
+                       (string-length url))))
+                ((string-prefix? "https://" url)
+                 (let ((has-slash (string-index (string-drop url 8) #\/)))
+                   (if has-slash
+                       (+ 8 has-slash)
+                       (string-length url))))
+                (else (string-length url)))))
+
+(define (proprify url)
+  "Remove extract / in URL path"
+  (let* ((path (string-split (uri-path (string->uri url)) #\/))
+         (clean (lambda (string)
+                  (not (or (equal? string "") (equal? string ".")))))
+         (path (filter clean path))
+         (join (lambda (lst) (string-join lst "/")))
+         (make-url (lambda (path)
+                     (string-append (url-domain url) "/" (join path)))))
+    (make-url (let loop ((path path) (out '()))
+                (if (null? path)
+                    (reverse out)
+                    (if (equal? (car path) "..")
+                        (loop (cdr path) (cdr out))
+                        (loop (cdr path) (cons (car path) out))))))))
+
+(define* ((href->url original-document-url) href)
+  (proprify (cond
+             ((string-prefix? "http" href) href)
+             ((string-prefix? "//" href)
+              (if (string-prefix? "http://" original-document-url)
+                  (string-append "http:" href)
+                  (string-append "https:" href)))
+             ((string-prefix? "/" href)
+              (string-append (url-domain original-document-url) href))
+             ;; ./foo/bar/baz and foo/bar/baz
+             (else
+              (if (string-suffix? "/" original-document-url)
+                  (string-append original-document-url href)
+                  (string-append (url-domain original-document-url)
+                                 "/"
+                                 (dirname (uri-path (string->uri original-document-url)))
+                                 "/"
+                                 href))))))
+
+(define (extract-links original-document-url html)
+  (let ((hrefs (extract-href html)))
+    (delete-duplicates
+     (map (href->url original-document-url)
+          (filter unsupported-href hrefs)))))
+
+(define (index-domain url)
+  (let loop ((urls (list url)))
+    (unless (null? urls)
+      (if (document-ref (car urls))
+          (loop (cdr urls))
+          (let* ((html (index* (car urls)))
+                 (links (extract-links url html))
+                 (new (filter (lambda (link) (equal? (uri-domain url) (uri-domain link))) links)))
+            (loop (delete-duplicates (lset-union equal? new (cdr urls)))))))))
+
+(define (view:add-domain context)
+  (let* ((url (car (context-get context "url"))))
+    (index-domain url)
     (render-html (template "add" "ok"))))
 
 (define (handler request body)
@@ -772,6 +856,7 @@ example: \"/foo/bar\" yields '(\"foo\" \"bar\")."
   (match (request-path-components request)
     (() (view:index context))
     (("add") (view:add context))
+    (("add" "domain") (view:add-domain context))
     (("static" path ...) (render-static-asset path))
     (_ (render-html (template "dunno" "dunno")))))
 

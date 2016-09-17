@@ -39,7 +39,9 @@
 (define-public (document-ref url)
   (call-with-cursor 'documents
     (lambda (cursor)
-      (cursor-value-ref* cursor url))))
+      (catch 'wiredtiger
+        (lambda () (cursor-value-ref* cursor url))
+        (lambda (key . args) #f)))))
 
 (define (index-term-with-position url-uid)
   (match-lambda
