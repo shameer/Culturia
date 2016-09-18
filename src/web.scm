@@ -732,20 +732,21 @@ example: \"/foo/bar\" yields '(\"foo\" \"bar\")."
                          (p (@ (class "link")) ,(car hits))))))
 
 
-(define (template:index-view hits)
+(define (template:index-view query hits)
   (template "index"
             `(div (form (@ (id "search") (method "GET"))
-                        (input (@ (type "text") (name "query")))
+                        (input (@ (type "text") (name "query") (value ,query)))
                         (input (@ (type "submit") (value "hypermove"))))
                   (div (@ (id "hits"))
                        ,(map template:result hits)))))
 
 (define (view:index context)
   (case (context-method context)
-    ((GET) (if (context-get context "query")
-               (let* ((hits (search* (query (car (context-get context "query"))))))
-                 (render-html (template:index-view hits)))
-               (render-html (template:index-view '()))))
+    ((GET) (let ((q (context-get context "query")))
+             (if q 
+                 (let* ((hits (search* (query (car q)))))
+                   (render-html (template:index-view (car q) hits)))
+                 (render-html (template:index-view "" '())))))
     (else (error))))
 
 ;;; index url
