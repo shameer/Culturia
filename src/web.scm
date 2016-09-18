@@ -736,7 +736,7 @@ example: \"/foo/bar\" yields '(\"foo\" \"bar\")."
 (define (template:index-view query hits)
   (template "index"
             `(div (form (@ (id "search") (method "GET"))
-                        (input (@ (type "text") (name "query") (value ,query)))
+                        (input (@ (type "text") (name "query") (value ,query) (autofocus "1")))
                         (input (@ (type "submit") (value "hypermove"))))
                   (div (@ (id "hits"))
                        ,(map template:result hits)))))
