@@ -49,7 +49,6 @@
 
 (use-modules (ice-9 hash-table))
 (use-modules (ice-9 regex))
-(use-modules (ice-9 threads))
 
 
 (setlocale LC_ALL "")
@@ -854,7 +853,7 @@ example: \"/foo/bar\" yields '(\"foo\" \"bar\")."
     
 (define (view:add-domain context)
   (let* ((url (car (context-get context "url"))))
-    (make-thread index-domain url)
+    (index-domain url)
     (render-html (template "add" "ok"))))
 
 (define (handler request body)
