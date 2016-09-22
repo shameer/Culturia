@@ -839,18 +839,19 @@ example: \"/foo/bar\" yields '(\"foo\" \"bar\")."
           (filter unsupported-href hrefs)))))
 
 (define (index-domain url)
-  (let loop ((urls (list url)))
-    (unless (null? urls)
-      (if (document-ref (car urls))
-          (loop (cdr urls))
-          (catch #true
-            (lambda () 
-              (let* ((html (index* (car urls)))
-                     (links (extract-links url html))
-                     (new (filter (lambda (link) (equal? (uri-domain url) (uri-domain link))) links)))
-                (loop (delete-duplicates (lset-union equal? new (cdr urls))))))
-            (lambda (key . args)
-              (loop (cdr urls))))))))
+  (with-context env
+    (let loop ((urls (list url)))
+      (unless (null? urls)
+        (if (document-ref (car urls))
+            (loop (cdr urls))
+            (catch #true
+              (lambda () 
+                (let* ((html (index* (car urls)))
+                       (links (extract-links url html))
+                       (new (filter (lambda (link) (equal? (uri-domain url) (uri-domain link))) links)))
+                  (loop (delete-duplicates (lset-union equal? new (cdr urls))))))
+              (lambda (key . args)
+                (loop (cdr urls)))))))))
     
 (define (view:add-domain context)
   (let* ((url (car (context-get context "url"))))
@@ -867,5 +868,7 @@ example: \"/foo/bar\" yields '(\"foo\" \"bar\")."
     (_ (render-html (template "dunno" "dunno")))))
 
 
-(with-env (env-open* "/tmp/wt" *wsh*)
+(define env (env-open* "/tmp/wt" *wsh*))
+
+(with-env env
   (run-server handler))
