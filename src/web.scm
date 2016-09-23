@@ -839,7 +839,7 @@ example: \"/foo/bar\" yields '(\"foo\" \"bar\")."
           (filter unsupported-href hrefs)))))
 
 (define (index-domain url)
-  (with-context env
+  (with-context*
     (let loop ((urls (list url)))
       (unless (null? urls)
         (if (document-ref (car urls))
@@ -867,8 +867,5 @@ example: \"/foo/bar\" yields '(\"foo\" \"bar\")."
     (("static" path ...) (render-static-asset path))
     (_ (render-html (template "dunno" "dunno")))))
 
-
-(define env (env-open* "/tmp/wt" *wsh*))
-
-(with-env env
+(with-env (env-open* "/tmp/wt" *wsh*)
   (run-server handler))

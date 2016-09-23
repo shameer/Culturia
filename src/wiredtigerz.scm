@@ -291,6 +291,7 @@ with cursor symbols as key and cursors as value"
 (define-record-type* <env> connection configs contexts mutex)
 
 (define-public *context* (make-unbound-fluid))
+(define-public *env* (make-unbound-fluid))
 
 (define-public (env-open path)
   (make-env (connection-open path "create") '() '() (make-mutex)))
@@ -340,11 +341,18 @@ with cursor symbols as key and cursors as value"
 
 (export with-context)
 
+(define-syntax-rule (with-context* body ...)
+  (let ((env (fluid-ref *env*)))
+    (with-context env body ...)))
+
+(export with-context*)
+
 (define-syntax-rule (with-env env body ...)
-  (let* ((env* env)
-         (out (with-context env* body ...)))
-    (env-close env*)
-    out))
+  (let ((env* env))
+    (with-fluids ((*env* env*))
+      (let ((out (with-context* body ...)))
+        (env-close env*)
+        out))))
 
 (export with-env)
 
