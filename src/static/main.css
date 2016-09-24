@@ -63,6 +63,10 @@ h1 a {
     margin: 0px;
 }
 
+#container #hits a p.title {
+    font-weight: bold;
+}
+
 #container #hits a p.link {
     font-size: 0.8em;
     color: #201A24;
