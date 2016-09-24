@@ -1,6 +1,6 @@
 body {
     display: flex;
-    flex-direction: row-reverse;
+    flex-direction: row;
     flex-wrap: wrap;
     background: #9369bf;
     color: white;
