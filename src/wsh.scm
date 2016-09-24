@@ -87,8 +87,9 @@
       (query/term token)))
 
 (define-public (query string)
-  (let ((tokens (filter (lambda (x) (not (equal? x ""))) (string-split string #\space))))
-    (apply query/and (map query% tokens))))
+  (let ((string (string-downcase string)))
+    (let ((tokens (filter (lambda (x) (not (equal? x ""))) (string-split string #\space))))
+      (apply query/and (map query% tokens)))))
         
 (define (search/vm query)
   (match query
