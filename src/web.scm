@@ -744,11 +744,16 @@ example: \"/foo/bar\" yields '(\"foo\" \"bar\")."
                   (div (@ (id "hits"))
                        ,(map template:result hits)))))
 
+(define (make-extract hits)
+  (if (< (length hits) 15)
+      (list-head hits 15)
+      hits))
+
 (define (view:index context)
   (case (context-method context)
     ((GET) (let ((q (context-get context "query")))
              (if q 
-                 (let* ((hits (list-head (search* (query (car q)))) 20))
+                 (let* ((hits (make-extract (search* (query (car q))))))
                    (render-html (template:index-view (car q) hits)))
                  (render-html (template:index-view "" '())))))
     (else (error))))
