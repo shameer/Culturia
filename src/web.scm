@@ -745,7 +745,7 @@ example: \"/foo/bar\" yields '(\"foo\" \"bar\")."
                        ,(map template:result hits)))))
 
 (define (make-extract hits)
-  (if (< (length hits) 15)
+  (if (> (length hits) 15)
       (list-head hits 15)
       hits))
 
