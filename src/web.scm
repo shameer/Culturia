@@ -732,6 +732,7 @@ example: \"/foo/bar\" yields '(\"foo\" \"bar\")."
   (let ((document (document-ref (car hits))))
     ;; document should never be false since it's a result of the search
     `(a (@ (href ,(car hits)))
+        (p (@ (class "title")) ,(vertex-ref document 'url/title))
         (p ,(vertex-ref document 'url/snippet))
         (p (@ (class "link")) ,(car hits)))))
 
@@ -776,14 +777,29 @@ example: \"/foo/bar\" yields '(\"foo\" \"bar\")."
 
 (define (index* url)
   (let* ((response (curl url))
-         (body (utf8->string (read-response-body (call-with-input-string response read-response)))))
-    (let* ((string (html2text body))
-           (snippet (make-snippet string)))
-      (let* ((html (html->sxml body))
-             (title (car ((sxpath '(// title *text*)) html))))
-        (add-document url title snippet)
-        (index url body)
-        html))))
+         (response (call-with-input-string response read-response)))
+    (if (equal? (car (response-content-type response)) 'text/html)
+      ;; read body
+      (let ((response (utf8->string (read-response-body response))))
+        ;; parse html and read title
+        (let* ((html (html->sxml response))
+               (title (car ((sxpath '(// title *text*)) html))))
+          ;; make snippet from body
+          ;; XXX: doing html2text over response includes the title of
+          ;; the page with extra stars chars which is ugly, here we
+          ;; fetch only the body and create a snippet from that this
+          ;; aint perfect because headings are also converted to text
+          ;; using star chars
+          (let* ((body (car ((sxpath '(// body)) html)))
+                 (body (with-output-to-string (lambda () (sxml->html body))))
+                 (body (html2text body))
+                 (snippet (make-snippet body)))
+            ;; add document to the database
+            (add-document url title snippet)
+            ;; index it
+            (index url response)
+            html)))
+      '())))
 
 (define (view:add context)
   (let* ((url (car (context-get context "url"))))
@@ -856,10 +872,10 @@ example: \"/foo/bar\" yields '(\"foo\" \"bar\")."
             (loop (cdr urls))
             (catch #true
               (lambda () 
-                (let* ((html (index* (car urls)))
-                       (links (extract-links url html))
-                       (new (filter (lambda (link) (equal? (uri-domain url) (uri-domain link))) links)))
-                  (loop (delete-duplicates (lset-union equal? new (cdr urls))))))
+                (let ((html (index* (car urls))))
+                  (let* ((links (extract-links url html))
+                         (new (filter (lambda (link) (equal? (uri-domain url) (uri-domain link))) links)))
+                    (loop (delete-duplicates (lset-union equal? new (cdr urls)))))))
               (lambda (key . args)
                 (loop (cdr urls)))))))))
     
