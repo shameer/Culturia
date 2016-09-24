@@ -46,6 +46,8 @@
 (use-modules (wiredtiger))
 (use-modules (wiredtigerz))
 (use-modules (wsh))
+(use-modules (ukv))
+(use-modules (grf3))
 
 (use-modules (ice-9 hash-table))
 (use-modules (ice-9 regex))
@@ -727,11 +729,11 @@ example: \"/foo/bar\" yields '(\"foo\" \"bar\")."
 ;;; db and model
 
 (define (template:result hits)
-  (match (document-ref (car hits))
-    ((title snippet) `(a (@ (href ,(car hits)))
-                         (p ,snippet)
-                         (p (@ (class "link")) ,(car hits))))))
-
+  (let ((document (document-ref (car hits))))
+    ;; document should never be false since it's a result of the search
+    `(a (@ (href ,(car hits)))
+        (p ,(vertex-ref document 'url/snippet))
+        (p (@ (class "link")) ,(car hits)))))
 
 (define (template:index-view query hits)
   (template "index"
@@ -752,6 +754,23 @@ example: \"/foo/bar\" yields '(\"foo\" \"bar\")."
 
 ;;; index url
 
+(define (add-document url title snippet)
+  (receive (new vertex) (get-or-create-vertex 'url/url url)
+    (let* ((vertex (vertex-set vertex 'url/title title))
+           (vertex (vertex-set vertex 'url/snippet snippet)))
+      (save vertex))))
+
+(define (document-ref url)
+  (let ((document (traversi->list (from 'url/url url))))
+    (if (null? document)
+        #false
+        (get (car document)))))
+
+(define (make-snippet string)
+  (if (< 200 (string-length string))
+      (remove-newlines (string-take string 200))
+      (remove-newlines string)))
+
 (define (remove-newlines string)
   (string-map (lambda (char) (if (equal? char #\newline) #\space char)) string))
 
@@ -759,7 +778,7 @@ example: \"/foo/bar\" yields '(\"foo\" \"bar\")."
   (let* ((response (curl url))
          (body (utf8->string (read-response-body (call-with-input-string response read-response)))))
     (let* ((string (html2text body))
-           (snippet (if (< 200 (string-length string)) (remove-newlines (string-take string 200)) string)))
+           (snippet (make-snippet string)))
       (let* ((html (html->sxml body))
              (title (car ((sxpath '(// title *text*)) html))))
         (add-document url title snippet)
@@ -858,5 +877,5 @@ example: \"/foo/bar\" yields '(\"foo\" \"bar\")."
     (("static" path ...) (render-static-asset path))
     (_ (render-html (template "dunno" "dunno")))))
 
-(with-env (env-open* "/tmp/wt" *wsh*)
+(with-env (env-open* "/tmp/wt" (cons* *ukv* *wsh*))
   (run-server handler))
