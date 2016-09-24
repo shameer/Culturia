@@ -783,20 +783,11 @@ example: \"/foo/bar\" yields '(\"foo\" \"bar\")."
            (string-prefix? "mailto:" href))))
 
 (define (url-domain url)
-  (string-take url
-               (cond
-                ((string-prefix? "http://" url)
-                 (let ((has-slash (string-index (string-drop url 7) #\/)))
-                   (if has-slash
-                       (+ 7 has-slash)
-                       (string-length url))))
-                ((string-prefix? "https://" url)
-                 (let ((has-slash (string-index (string-drop url 8) #\/)))
-                   (if has-slash
-                       (+ 8 has-slash)
-                       (string-length url))))
-                (else (string-length url)))))
-
+  (let ((uri (string->uri url)))
+    (string-append (symbol->string (uri-scheme uri))
+                   "://"
+                   (uri-host uri))))
+  
 (define (proprify url)
   "Remove extract / in URL path"
   (let* ((path (string-split (uri-path (string->uri url)) #\/))
