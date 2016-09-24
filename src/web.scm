@@ -748,7 +748,7 @@ example: \"/foo/bar\" yields '(\"foo\" \"bar\")."
   (case (context-method context)
     ((GET) (let ((q (context-get context "query")))
              (if q 
-                 (let* ((hits (search* (query (car q)))))
+                 (let* ((hits (list-take (list-head (search* (query (car q)))) 20)))
                    (render-html (template:index-view (car q) hits)))
                  (render-html (template:index-view "" '())))))
     (else (error))))
