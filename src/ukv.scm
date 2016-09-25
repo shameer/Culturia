@@ -11,8 +11,6 @@
 
 (set! *random-state* (random-state-from-platform))
 
-(setlocale LC_ALL "")
-
 ;;;
 ;;; UKV ukv spec
 ;;;
