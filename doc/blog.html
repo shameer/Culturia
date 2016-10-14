@@ -84,34 +84,11 @@ solution and then maybe move (back) things to lower levels when
 required.</p><ul><li><p>implement <code>ukv</code> assoc space databae on top of the new <code>env</code> API</p></li><li><p>implement <code>grf3</code> graphdb lib on top ukv</p></li><li><p>implement <code>wsh2</code> boolean keyword search engine on top of <code>grf3</code></p></li></ul><p>I have been searching for information regarding concept search on the
 web.  The
 <a href="https://en.wikipedia.org/wiki/Concept_search">wikipedia article</a> is
-poor. Two urls seems interesting:</p><ul><li><p><a href="http://www.ulakha.com/concept-search-eswc2009.html">Concept Search by Fausto Giunchiglia et. al</a></p></li><li><p><a href="https://www.google.com/patents/US6675159">Concept-based search and retrieval system (US 6675159 B1)</a></p></li></ul><p>The later provide a good overview of the state of the art. That&apos;s why
-I discuss it in what follows.</p><p>The summary of the patent is as follows:</p><blockquote><p>A concept-based indexing and search system indexes collections of
-documents with ontology-based predicate structures through automated
-and/or human-assisted methods. The system extracts the concepts
-behind user queries to return only those documents that match those
-concepts. The concept based search and retrieval system comprehends
-the intent behind a query from a user, and returns results matching
-that intent. The system can perform off-line searches for unanswered
-user queries and notify the user when a match is found.</p></blockquote><p>Basically what the patent claims is both an improvement in concept
-search and user interface. Queries can return no results but might
-return results in the future.  In the descibed system the user can
-receive results later. That&apos;s the main user interface improvement.
-Concept search is done using various techniques. The primary
-&quot;innovation&quot; that brings this patents is the use of both ontologies
-and NLP techniques to match queries to documents.</p><p>There is also a review of already existing patents. Things that I recall
-while reading this document:</p><ul><li><p>Building logical form of queries and documents can be useful.</p></li><li><p>Turning documents into question / answer pairs is something to be
+poor. Two urls seems interesting:</p><ul><li><a href="http://www.ulakha.com/concept-search-eswc2009.html">Concept Search by Fausto Giunchiglia et. al</a></li></ul><p>Mixing both NLP and simple keyword search can lead to interesting results:</p><ul><li><p>Building logical form of queries and documents can be useful.</p></li><li><p>Turning documents into question / answer pairs is something to be
 investigated.</p></li><li><p>Semantic folding of documents leads to the construction of tuples
 that can take the form of (CONCEPT, RELATION, CONCEPT) for instance
 (OCTOPUS, IS_A, ANIMAL).  Which leads to think that common sens
-should be infered from the indexed corpus.</p></li><li><p>They are at least another example given of tuple representation of
-knowledge which I think is summed by the first point. They are also
-called logical triples.</p></li><li><p>Query semantic folding can be done but with care. see below.</p></li><li><p>Given different context, use different processings. For instance,
+should be infered from the indexed corpus. Also called logical triples.</p></li><li><p>Query semantic folding can be done but with care.</p></li><li><p>Given different context, use different processings. For instance,
 they only extend a query&apos;s semantic e.g. via synonyms if there is no
 or little results in the vanilla query. Whereas semantic folding of
-documents is done all the time.</p></li><li><p>They also use semantic inference to provide similar results and take
-the example of &quot;what biological weapons are used by the USA&quot;. If no
-results are found for that query, similar queries can have results
-like &quot;what weapons are used by the USA&quot; or &quot;what weapons are used by
-countries near the USA&quot;.</p></li><li><p>They also use some Bayes algorithm to cluster documents. But this is
-a supervised algorithm, it&apos;s not the kind of algorithm I&apos;d like to use
-in Culturia.</p></li></ul><p>I think that is the interesting things for now.</p></div><p><small>cc-by-nc-sa</small></p></body></html>
+documents is done all the time.</p></li></ul><p>I think that is the interesting things for now.</p></div><p><small>cc-by-nc-sa</small></p></body></html>
