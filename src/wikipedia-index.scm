@@ -14,6 +14,9 @@
 (use-modules (wsh))
 
 
+(setlocale LC_ALL "")
+
+
 (define (remove-newlines string)
   (string-map (lambda (char) (if (equal? char #\newline) #\space char)) string))
 
@@ -37,9 +40,9 @@
 (define (index* path)
   (let* ((name (basename path))
          (url (string-append "https://en.wikipedia.org/wiki/" name)))
-    (pk name)
     (with-input-from-file path
       (lambda ()
+        (display path) (newline)
         (let ((response (read-string)))
           ;; parse html
           (let ((html (html->sxml response)))
@@ -63,6 +66,7 @@
                     (add-document url title snippet)
                     ;; index it
                     (index url response)))))))))))
-  
+
+
 (with-env (env-open* "/tmp/wt" (cons* *ukv* *wsh*))
   (path-walk "data/wikipedia.en/A" index*))

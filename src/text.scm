@@ -5,27 +5,16 @@
 (use-modules (srfi srfi-1))
 (use-modules (srfi srfi-26))
 
+(use-modules (htmlprag))
+(use-modules (html2text))
 
-;;;
-;;; wrapping html2text
-;;;
-;;
-;; inspired from ice-9 popen
-;;
-
-(define open-process (@@ (ice-9 popen) open-process))
+;;; backward compatible with old html2text bindings
+;;; TODO: use html->text directly
 
 (define-public (html2text string)
-  (with-error-to-file "/dev/null"
-    (lambda ()
-      (call-with-values (lambda () (open-process OPEN_BOTH "html2text"))
-        (lambda (read-port write-port pid)
-          (display string write-port)
-          (close-port write-port)
-          (let ((str (read-string read-port)))
-            (close-port read-port)
-            (waitpid pid)
-            str))))))
+  (call-with-output-string
+    (lambda (port)
+      (html->text (html->sxml string) port))))
 
 ;;;
 ;;; tokenizing
