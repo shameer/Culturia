@@ -1,6 +1,5 @@
 -*- mode: org -*-
 
-* create sophia.systems bindings
 * wiredtiger
 ** improve exceptions
 ** improve connection-add-collator to use scheme spec instead of wt columns strings
@@ -10,8 +9,7 @@
 * wiredtigerz
 ** improve performance of cursor-count-near
 * offline use
-* Documentation
-** fix markdown parser cf. wiredtigerz.md
+* Documentation is out dated
 * wsh
 ** rename search/term, search/and etc... to query/term, query/and etc...
 ** test with terms that are not in the database
