@@ -13,3 +13,6 @@
 * wsh
 ** rename search/term, search/and etc... to query/term, query/and etc...
 ** test with terms that are not in the database
+* add an UI to add domains to be crawled
+* use a worker thread to crawl instead of spawning a thread per task
+* add an interface to edit KB
