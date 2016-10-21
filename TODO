@@ -16,3 +16,10 @@
 * add an UI to add domains to be crawled
 * use a worker thread to crawl instead of spawning a thread per task
 * add an interface to edit KB
+* needed apps:
+** search
+** messaging
+** mail
+** blog
+** calendar
+** bookmark
