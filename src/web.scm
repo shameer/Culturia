@@ -42,6 +42,7 @@
 (use-modules (html))
 (use-modules (text))
 (use-modules (http))
+(use-modules (json))
 
 (use-modules (wiredtiger))
 (use-modules (wiredtigerz))
@@ -657,6 +658,11 @@ example: \"/foo/bar\" yields '(\"foo\" \"bar\")."
           (lambda (port)
             (sxml->html sxml port))))
 
+(define (render-json alist)
+  (values '((content-type . (application/json)))
+          (lambda (port)
+            (write-json `(@ ,@alist) port))))
+
 (define (not-found uri)
   (values (build-response #:code 404)
           (string-append "Resource not found: " uri)))
@@ -876,12 +882,14 @@ example: \"/foo/bar\" yields '(\"foo\" \"bar\")."
         (if (document-ref (car urls))
             (loop (cdr urls))
             (catch #true
-              (lambda () 
+              (lambda ()
+                (pk 'indexing (car urls))
                 (let ((html (index* (car urls))))
                   (let* ((links (extract-links url html))
                          (new (filter (lambda (link) (equal? (uri-domain url) (uri-domain link))) links)))
                     (loop (delete-duplicates (lset-union equal? new (cdr urls)))))))
               (lambda (key . args)
+                (pk 'error)
                 (loop (cdr urls)))))))))
     
 (define (view:add-domain context)
@@ -889,14 +897,47 @@ example: \"/foo/bar\" yields '(\"foo\" \"bar\")."
     (make-thread index-domain url)
     (render-html (template "add" "ok"))))
 
+(define (make-text-answer text)
+  `(("status" . "ok") ("answer" . (@ ("text" . ,text)))))
+
+(define (make-error text)
+  `(("status" . "ko") ("answer" . (@ ("text" . ,text)))))
+
+(define (search** terms) 
+  (define (make-result hit)
+    (let ((document (document-ref (car hit))))
+      ;; document should never be false since it's a result of the search
+      `(@ ("title" . ,(vertex-ref document 'url/title))
+          ("snippet" . ,(vertex-ref document 'url/snippet))
+          ("url" . ,(car hit)))))
+  (map make-result (make-extract (search* (query (string-join terms " "))))))
+
+(define (make-hits-answer hits)
+  `(("status" . "ok") ("answer" . (@ ("hits" . ,hits)))))
+
+(define (api context)
+  (let ((query (car (context-post context "query"))))
+    (match (string-split query #\space)
+      (("search" "for" terms ...)
+       (let ((hits (search** terms)))
+         (if (null? hits)
+             (render-json (make-text-answer "No results."))
+             (render-json (make-hits-answer hits)))))
+      (("index" url)
+       (index* url)
+       (render-json (make-text-answer "Done.")))
+      (("index" "domain" url)
+       (make-thread index-domain url)
+       (render-json (make-text-answer (format "Index request for domain ~s will be taken into account" url))))
+      (_ (render-json (make-error "I don't understand your query"))))))
+
 (define (handler request body)
   (define context (make-context request body))
   (match (request-path-components request)
-    (() (view:index context))
-    (("add") (view:add context))
-    (("add" "domain") (view:add-domain context))
+    (() (render-static-asset (list "index.html")))
+    (("api") (api context))
     (("static" path ...) (render-static-asset path))
-    (_ (render-html (template "dunno" "dunno")))))
+    (_ (render-static-asset (list "index.html")))))
 
 (with-env (env-open* "/tmp/wt" (cons* *ukv* *wsh*))
   (run-server handler))
