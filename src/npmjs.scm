@@ -20,6 +20,8 @@
 ;    #: export (square
 ;               cube))
 
+(setlocale LC_ALL "")
+
 
 (define (json-fetch url)
   "Return a alist representation of the JSON resource URL, or #f on failure."
