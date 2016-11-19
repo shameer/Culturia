@@ -293,8 +293,8 @@ with cursor symbols as key and cursors as value"
 (define-public *context* (make-unbound-fluid))
 (define-public *env* (make-unbound-fluid))
 
-(define-public (env-open path)
-  (make-env (connection-open path "create") '() '() (make-mutex)))
+(define-public (env-open path config)
+  (make-env (connection-open path config) '() '() (make-mutex)))
 
 (define-public (env-close env)
   (connection-close (env-connection env)))
@@ -308,10 +308,10 @@ with cursor symbols as key and cursors as value"
     (apply session-create* (cons session (env-configs env)))
     (session-close session)))
 
-(define-public (env-open* path configs)
+(define-public (env-open* path specs config)
   "open and init an environment"
-  (let ((env (env-open path)))
-    (for-each (cut env-config-add env <>) configs)
+  (let ((env (env-open path config)))
+    (for-each (cut env-config-add env <>) specs)
     (env-create env)
     env))
 

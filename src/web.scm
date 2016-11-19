@@ -671,7 +671,8 @@ example: \"/foo/bar\" yields '(\"foo\" \"bar\")."
   (values (build-response #:code 303 #:headers `((Location . ,uri))) ""))
 
 (define (error)
-  (values (build-response #:code 500)))
+  (values (build-response #:code 500)
+          "Internal Server Error"))
 
 
 ;;;
@@ -877,20 +878,21 @@ example: \"/foo/bar\" yields '(\"foo\" \"bar\")."
 
 (define (index-domain url)
   (with-context*
-    (let loop ((urls (list url)))
-      (unless (null? urls)
-        (if (document-ref (car urls))
-            (loop (cdr urls))
-            (catch #true
-              (lambda ()
-                (pk 'indexing (car urls))
-                (let ((html (index* (car urls))))
-                  (let* ((links (extract-links url html))
-                         (new (filter (lambda (link) (equal? (uri-domain url) (uri-domain link))) links)))
-                    (loop (delete-duplicates (lset-union equal? new (cdr urls)))))))
-              (lambda (key . args)
-                (pk 'error)
-                (loop (cdr urls)))))))))
+   (with-transaction
+       (let loop ((urls (list url)))
+         (unless (null? urls)
+           (if (document-ref (car urls))
+               (loop (cdr urls))
+               (catch #true
+                 (lambda ()
+                   (pk 'indexing (car urls))
+                   (let ((html (index* (car urls))))
+                     (let* ((links (extract-links url html))
+                            (new (filter (lambda (link) (equal? (uri-domain url) (uri-domain link))) links)))
+                       (loop (delete-duplicates (lset-union equal? new (cdr urls)))))))
+                 (lambda (key . args)
+                   (pk 'error)
+                   (loop (cdr urls))))))))))
     
 (define (view:add-domain context)
   (let* ((url (car (context-get context "url"))))
@@ -924,11 +926,12 @@ example: \"/foo/bar\" yields '(\"foo\" \"bar\")."
              (render-json (make-text-answer "No results."))
              (render-json (make-hits-answer hits)))))
       (("index" url)
-       (index* url)
+       (with-transaction
+           (index* url))
        (render-json (make-text-answer "Done.")))
       (("index" "domain" url)
        (make-thread index-domain url)
-       (render-json (make-text-answer (format "Index request for domain ~s will be taken into account" url))))
+       (render-json (make-text-answer (format #f "Index request for domain ~s will be taken into account" url))))
       (_ (render-json (make-error "I don't understand your query"))))))
 
 (define (handler request body)
@@ -939,5 +942,7 @@ example: \"/foo/bar\" yields '(\"foo\" \"bar\")."
     (("static" path ...) (render-static-asset path))
     (_ (render-static-asset (list "index.html")))))
 
-(with-env (env-open* "/tmp/wt" (cons* *ukv* *wsh*))
+(define config "create,log=(enabled=true)")
+
+(with-env (env-open* "/tmp/wt" (cons* *ukv* *wsh*) config)
   (run-server handler))
